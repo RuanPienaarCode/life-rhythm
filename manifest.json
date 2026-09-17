@@ -1,0 +1,9 @@
+{
+  "id": "rhythm",
+  "name": "Rhythm",
+  "version": "0.1.0",
+  "minAppVersion": "1.8.0",
+  "description": "A quiet dashboard for life priorities, practices, goals and events — daily, weekly and monthly rhythms kept as plain notes in your vault.",
+  "author": "Ruan Pienaar",
+  "isDesktopOnly": false
+}
