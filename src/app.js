@@ -51,7 +51,7 @@ function mountApp(view) {
     enter: true,
   };
 
-  let header, nav, main, toastEl, reloadTimer = null, toastTimer = null, stopped = false;
+  let header, nav, main, toastEl, reloadTimer = null, toastTimer = null, stopped = false, resizeObserver = null;
 
   const fail = (what, e, msg) => { console.error('rhythm ' + what, e); new Notice('Rhythm: ' + msg); };
 
@@ -61,27 +61,35 @@ function mountApp(view) {
     get events() { return [...state.data.events, ...calendarEvents(plugin)]; },
     store,
     plugin,
-    /* Tick or untick, with an undo toast. */
+    /* Tick or untick, with an undo toast. Undo puts back all four flags as
+       they were, because a tick also clears skip, snooze and the day's plan
+       (and a skip clears done and plan) — flipping one flag back loses them. */
     async toggle(name, date, on) {
       try {
-        await store.setDone(date, name, on);
+        const r = await store.setDone(date, name, on);
         await ctx.reload();
-        ctx.toast(on ? `Ticked ${name}` : `Unticked ${name}`, 'Undo', () => ctx.toggle(name, date, !on, true));
+        ctx.toast(on ? `Ticked ${name}` : `Unticked ${name}`, 'Undo', () => ctx.restore(name, date, r && r.prev));
       } catch (e) { fail('toggle', e, 'could not save that tick.'); }
     },
     async skip(name, date, on) {
       try {
-        await store.setSkip(date, name, on);
+        const r = await store.setSkip(date, name, on);
         await ctx.reload();
-        if (on) ctx.toast(`Not today: ${name}`, 'Undo', () => ctx.skip(name, date, false));
+        if (on) ctx.toast(`Not today: ${name}`, 'Undo', () => ctx.restore(name, date, r && r.prev));
       } catch (e) { fail('skip', e, 'could not save that.'); }
     },
     async snooze(name, date, on) {
       try {
-        await store.setSnooze(date, name, on);
+        const r = await store.setSnooze(date, name, on);
         await ctx.reload();
-        if (on) ctx.toast(`Later: ${name}`, 'Undo', () => ctx.snooze(name, date, false));
+        if (on) ctx.toast(`Later: ${name}`, 'Undo', () => ctx.restore(name, date, r && r.prev));
       } catch (e) { fail('snooze', e, 'could not save that.'); }
+    },
+    async restore(name, date, prev) {
+      try {
+        await store.restoreFlags(date, name, prev);
+        await ctx.reload();
+      } catch (e) { fail('undo', e, 'could not undo that.'); }
     },
     toast(text, label, action) {
       if (!toastEl) return;
@@ -190,9 +198,9 @@ function mountApp(view) {
       try {
         let path = rec.path;
         if (newName && newName !== rec.name) {
-          const np = await store.rename(path, newName);
-          if (!np) { new Notice(`Rhythm: something called "${newName}" already exists.`); }
-          else path = np;
+          const r = await store.rename(path, newName);
+          if (!r) { new Notice(`Rhythm: something called "${newName}" already exists.`); }
+          else path = r.path;
         }
         if (Object.keys(fields).length) await store.patch(path, fields);
         await ctx.reload();
@@ -387,6 +395,18 @@ function mountApp(view) {
       }
       if (view.registerDomEvent) view.registerDomEvent(root, 'keydown', onKey);
       else root.addEventListener('keydown', onKey);
+      /* The phone layout (bottom tab bar, hidden wide-only chrome) has to
+         key on the PANE's own width, not the window's — a narrow sidebar
+         on desktop is exactly as cramped as a phone screen, and a wide
+         phone-in-landscape pane is not. */
+      if (typeof ResizeObserver !== 'undefined') {
+        resizeObserver = new ResizeObserver(entries => {
+          const w = entries[0].contentRect.width;
+          root.classList.toggle('is-narrow', w < 560);
+          root.classList.toggle('is-xnarrow', w < 480);
+        });
+        resizeObserver.observe(root);
+      }
       if (view.registerInterval) {
         view.registerInterval(window.setInterval(() => {
           const t = D.todayISO();
@@ -398,7 +418,7 @@ function mountApp(view) {
       if (splash) splash.leave();
       if (isStale(plugin)) ctx.refreshCalendars(true);
     },
-    stop() { stopped = true; if (reloadTimer) clearTimeout(reloadTimer); if (toastTimer) clearTimeout(toastTimer); },
+    stop() { stopped = true; if (reloadTimer) clearTimeout(reloadTimer); if (toastTimer) clearTimeout(toastTimer); if (resizeObserver) resizeObserver.disconnect(); },
     render,
   };
 }

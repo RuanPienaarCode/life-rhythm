@@ -70,26 +70,56 @@ const PREFIXES = {
 
 /* Add the prefix to every line the selection touches, or strip it from all
    of them when they all already have it. Blank lines inside a block are
-   left alone rather than turned into empty bullets. */
+   left alone rather than turned into empty bullets.
+
+   A collapsed caret (start === end, always a single line — see
+   lineRange) never SELECTS the transformed line: it stays collapsed at
+   the same logical spot in the text, so typing continues the line rather
+   than replacing a highlighted marker. A real multi-char selection keeps
+   selecting the whole transformed block, as before. */
 function linePrefix(text, start, end, kind) {
   const spec = PREFIXES[kind];
   if (!spec) return { text, start, end };
+  const collapsed = start === end;
   const [from, to] = lineRange(text, start, end);
+  const relIn = collapsed ? start - from : null;
   const lines = text.slice(from, to).split('\n');
   const real = lines.filter(l => l.trim() !== '');
   const allHave = real.length > 0 && real.every(spec.has);
 
   let n = 0;
+  let relOut = null;
   const out = lines.map(l => {
     if (l.trim() === '' && lines.length > 1) return l;
-    if (allHave) return l.replace(spec.re, '$1');
+    if (allHave) {
+      const stripped = l.replace(spec.re, '$1');
+      if (collapsed) {
+        const m = spec.re.exec(l);
+        const lead = m[1].length;
+        const removedLen = m[0].length - lead;
+        relOut = relIn <= lead ? relIn : (relIn <= lead + removedLen ? lead : relIn - removedLen);
+      }
+      return stripped;
+    }
     /* A line already carrying a DIFFERENT list marker swaps rather than
        stacking, so a bullet list becomes a task list cleanly. Task first:
        it is the longer marker and contains the bullet's. */
     const bare = l.replace(TASK_RE, '$1').replace(BULLET_RE, '$1').replace(PREFIXES.number.re, '$1');
-    return bare.replace(/^(\s*)/, `$1${spec.make(n++)}`);
+    const marker = spec.make(n++);
+    const made = bare.replace(/^(\s*)/, `$1${marker}`);
+    if (collapsed) {
+      const lead = /^(\s*)/.exec(l)[1].length;
+      const strippedLen = l.length - bare.length;
+      const bpos = relIn <= lead ? relIn : Math.max(lead, relIn - strippedLen);
+      relOut = lead + marker.length + Math.max(0, bpos - lead);
+    }
+    return made;
   }).join('\n');
 
+  if (collapsed) {
+    const at = from + relOut;
+    return { text: text.slice(0, from) + out + text.slice(to), start: at, end: at };
+  }
   return { text: text.slice(0, from) + out + text.slice(to), start: from, end: from + out.length };
 }
 

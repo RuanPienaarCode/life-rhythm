@@ -93,7 +93,12 @@ assert.strictEqual(M.progress(practices[3], log4, '2026-09-11', 1).snoozed, fals
 
 /* ---- reasons ---- */
 assert.strictEqual(plan.focus.find(r => r.p.name === 'Exercise').reason, '2 more this week · 3 days left');
-assert.strictEqual(plan.focus.find(r => r.p.name === 'Journal').reason, 'Missed 4 days', 'no tick Mon–Thu');
+/* Journal has never once appeared in this log (no done/skip/snooze/plan
+   entry, no `created`) — with no evidence of its own history it starts
+   today, not on the log's overall first date (that belonged to other
+   practices). See the dedicated M3 block below for the borrowed-history
+   regression this guards. */
+assert.strictEqual(plan.focus.find(r => r.p.name === 'Journal').reason, 'Every day', 'no history of its own → not a borrowed "Missed 4 days"');
 assert.strictEqual(M.reasonFor(practices[5], M.progress(practices[5], log, '2026-09-12', 1), log, '2026-09-12'), 'Saturdays');
 const lastChance = M.progress(practices[3], log, '2026-09-13', 1);
 assert.strictEqual(M.reasonFor(practices[3], lastChance, log, '2026-09-13'), 'Last chance this week');
@@ -174,6 +179,43 @@ assert.deepStrictEqual(
   M.planDay(timed, today, { focusCount: 3, weekStart: 1 }).focus.map(r => r.p.name),
   ['CrossFit', 'Stretch', 'Walk'],
   'earliest first, and anything untimed comes after everything timed');
+
+/* ---- M3: a brand-new practice must not borrow another practice's history ---- */
+{
+  const freshLog = new Map();
+  for (let i = 1; i <= 60; i++) freshLog.set(D.addDays('2026-09-11', -i), E(['Read the Bible']));
+  const stretch = { name: 'Stretch', area: 'Body', cadence: 'daily' };
+  assert.strictEqual(M.missedRun(stretch, freshLog, '2026-09-11'), 0, 'no tick and no created → starts today, not "Missed 7 days"');
+  const pr = M.progress(stretch, freshLog, '2026-09-11', 1);
+  assert.strictEqual(M.reasonFor(stretch, pr, freshLog, '2026-09-11'), 'Every day', 'the normal cadence text, per the promise at model.js:153');
+  /* With a `created` date it counts back to THAT, not to today and not to
+     some other practice's 60-day log. */
+  const created = { name: 'Stretch', area: 'Body', cadence: 'daily', created: '2026-09-08' };
+  assert.strictEqual(M.missedRun(created, freshLog, '2026-09-11'), 3, 'missed the 8th, 9th and 10th — created on the 8th');
+}
+
+/* ---- M2: a practice added today must not rewrite past weeks' verdict ---- */
+{
+  const faithAreas = [{ name: 'Faith', order: 1 }];
+  const base = [{ name: 'Read', area: 'Faith', cadence: 'daily' }];
+  const weekLog = new Map();
+  for (let i = 0; i < 35; i++) weekLog.set(D.addDays('2026-09-11', -i), E(['Read']));
+  const before = M.weekStreak({ areas: faithAreas, practices: base, log: weekLog }, '2026-09-11', 1);
+  const withNew = [...base, { name: 'Stretch', area: 'Faith', cadence: 'daily' }, { name: 'Journal', area: 'Faith', cadence: 'daily' }];
+  const after = M.weekStreak({ areas: faithAreas, practices: withNew, log: weekLog }, '2026-09-11', 1);
+  assert.strictEqual(before, 5, '35 perfect days = 5 good weeks');
+  assert.strictEqual(after, before, 'two new daily practices with no history yet must not zero out the streak');
+}
+
+/* ---- day streak: an unticked "today" shows the run through yesterday ---- */
+{
+  const dayLog = new Map();
+  for (let i = 1; i <= 10; i++) dayLog.set(D.addDays('2026-09-11', -i), E(['Read']));
+  dayLog.set('2026-09-11', E([]));
+  assert.strictEqual(M.streakLabel({ log: dayLog }, '2026-09-11', {}), '10 days in a row', 'nothing ticked yet today still reads as the 10-day run through yesterday');
+  dayLog.set('2026-09-10', E([])); // yesterday itself blank now — the run really is broken
+  assert.strictEqual(M.streakLabel({ log: dayLog }, '2026-09-11', {}), '', 'a whole blank PAST day does break it');
+}
 
 /* dates */
 assert.strictEqual(D.weekStart('2026-09-13', 1), '2026-09-07');

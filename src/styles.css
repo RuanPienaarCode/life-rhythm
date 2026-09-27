@@ -167,20 +167,21 @@
 .rv-app button.rv-tab.is-active { background: var(--rv-seg-on); box-shadow: var(--rv-seg-shadow); font-weight: 600; }
 .theme-dark .rv-app button.rv-tab.is-active { color: #fff; }
 
-@media (max-width: 560px) {
-  .rv-app .rv-tabs {
-    top: auto; bottom: 0; left: 0; right: 0; transform: none;
-    max-width: none; border-radius: 0; padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
-    background: var(--rv-toolbar);
-    -webkit-backdrop-filter: saturate(180%) blur(20px);
-    backdrop-filter: saturate(180%) blur(20px);
-    border-top: 0.5px solid var(--rv-hair);
-    gap: 4px;
-  }
-  .rv-app button.rv-tab { padding: 8px 6px; font-size: 12.5px; border-radius: 8px; }
-  .rv-app button.rv-tab.is-active { background: var(--rv-tint-soft); color: var(--rv-tint-text); box-shadow: none; }
-  .rv-app .rv-main { padding-bottom: calc(52px + env(safe-area-inset-bottom, 0px)); }
+/* Keyed on the PANE's width (an .is-narrow class the ResizeObserver in
+   app.js keeps in sync), not the window's — a narrow sidebar on desktop
+   is exactly as cramped as a phone screen. */
+.rv-app.is-narrow .rv-tabs {
+  top: auto; bottom: 0; left: 0; right: 0; transform: none;
+  max-width: none; border-radius: 0; padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
+  background: var(--rv-toolbar);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+  border-top: 0.5px solid var(--rv-hair);
+  gap: 4px;
 }
+.rv-app.is-narrow button.rv-tab { padding: 8px 6px; font-size: 12.5px; border-radius: 8px; }
+.rv-app.is-narrow button.rv-tab.is-active { background: var(--rv-tint-soft); color: var(--rv-tint-text); box-shadow: none; }
+.rv-app.is-narrow .rv-main { padding-bottom: calc(52px + env(safe-area-inset-bottom, 0px)); }
 
 /* ---- main ------------------------------------------------------------ */
 
@@ -382,7 +383,7 @@
    a wrapped four-line row turns a list of eight areas into a page. */
 .rv-app .rv-row-area .rv-row-meta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rv-app .rv-row-area .rv-row-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-@media (max-width: 480px) { .rv-app .rv-wide-only { display: none; } }
+.rv-app.is-xnarrow .rv-wide-only { display: none; }
 
 /* a practice shown inside an open area */
 .rv-app .rv-row-sub { padding-left: 54px; background: var(--rv-cell-2); min-height: 46px; }
@@ -422,7 +423,7 @@
   position: absolute; z-index: 5; left: 50%; bottom: 20px; transform: translate(-50%, 20px);
   opacity: 0; pointer-events: none; transition: opacity 0.2s, transform 0.2s;
 }
-@media (max-width: 560px) { .rv-app .rv-toast { bottom: calc(66px + env(safe-area-inset-bottom, 0px)); } }
+.rv-app.is-narrow .rv-toast { bottom: calc(66px + env(safe-area-inset-bottom, 0px)); }
 .rv-app .rv-toast.is-on { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
 .rv-app .rv-toast-inner {
   display: flex; align-items: center; gap: 14px;

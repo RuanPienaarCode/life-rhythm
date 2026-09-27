@@ -88,6 +88,15 @@ const past = new Map([['2026-09-05', E({ plan: ['Paint'] })]]);
 assert.strictEqual(M.progress(practices[2], past, today, 1).deferredTo, null, 'a promise to a past day is spent');
 assert.ok(M.planDay(mk(past), today, { focusCount: 3, weekStart: 1 }).focus.some(r => r.p.name === 'Paint'));
 
+/* ---- a plan only quiets a practice within its CURRENT period ---- */
+/* Paint (weekly) is promised for Tue 15 Sep — NEXT week, from a Sat 12 Sep
+   vantage (week runs Mon 7–Sun 13). This week's unmet Paint must stay due
+   and on the shelf; only next week's board should treat it as placed. */
+const nextWeekPlan = { areas: [{ name: 'Craft', order: 1 }], practices: [{ name: 'Paint', area: 'Craft', cadence: 'weekly' }], log: new Map([['2026-09-15', E({ plan: ['Paint'] })]]) };
+const satPlan = M.planDay(nextWeekPlan, '2026-09-12', { weekStart: 1 });
+assert.ok(satPlan.focus.some(r => r.p.name === 'Paint'), 'this week is still owed, a next-week promise does not silence it');
+assert.deepStrictEqual(M.shelf(nextWeekPlan, '2026-09-12', 7, { weekStart: 1 }).map(r => `${r.p.name}×${r.need}`), ['Paint×1'], 'not counted as placed — the promise lands outside this period');
+
 /* ---- deck order rotates without changing anything ---- */
 /* deck.js reaches dom.js, which imports `obsidian` — stub it so the pure
    helper can be exercised without a host. */

@@ -53,12 +53,20 @@ function makeStore(plugin) {
        list so the Areas page can show them and offer them back. Everything
        else in the plugin reads `practices` and so never sees them.
        `paused` is the older spelling of the same thing. */
-    const allPractices = (await readAll(dir('practices'))).map(r => ({
-      name: r.name, area: r.fm.area || '', cadence: r.fm.cadence || 'daily', days: r.fm.days,
-      minutes: num(r.fm.minutes), when: r.fm.when || '', time: r.fm.time ? String(r.fm.time) : '',
-      note: firstLine(r.body), path: r.path,
-      aside: r.fm.status === 'aside' || r.fm.status === 'paused',
-    }));
+    const allPractices = (await readAll(dir('practices'))).map(r => {
+      /* LOCAL date the note was created, for missedRun/practiceStart in
+         model.js — a brand-new practice must not open with a borrowed
+         "missed N days" streak. Omitted when the host gives no stat. */
+      const ctime = r.file && r.file.stat && r.file.stat.ctime;
+      const created = Number.isFinite(ctime) ? D.toISO(new Date(ctime)) : undefined;
+      return {
+        name: r.name, area: r.fm.area || '', cadence: r.fm.cadence || 'daily', days: r.fm.days,
+        minutes: num(r.fm.minutes), when: r.fm.when || '', time: r.fm.time ? String(r.fm.time) : '',
+        note: firstLine(r.body), path: r.path,
+        aside: r.fm.status === 'aside' || r.fm.status === 'paused',
+        ...(created ? { created } : {}),
+      };
+    });
     const practices = allPractices.filter(p => !p.aside);
     const aside = allPractices.filter(p => p.aside);
     const goals = (await readAll(dir('goals'))).map(r => ({
@@ -140,38 +148,99 @@ function makeStore(plugin) {
     return writeIfAbsent(notePath('events', e.name), buildNote(fm, e.body || ''));
   }
 
+  /* Every read-modify-write of an EXISTING note goes through vault.process:
+     it is atomic on the host (queued per file since Obsidian 1.1), so two
+     quick writes to the same note can no longer clobber one another. */
   async function patch(path, fields) {
     const f = v.getFileByPath(path);
     if (!f) return false;
-    const text = await v.read(f);
     stamp();
-    await v.modify(f, patchFrontmatter(text, fields));
+    await v.process(f, text => patchFrontmatter(text, fields));
     return true;
   }
 
+  /* Rewrite oldName -> newName in the done/skip/snooze/plan lists of every
+     Log note that mentions it (a renamed PRACTICE must not orphan its own
+     history). Returns the count of notes touched. */
+  async function renamePracticeRefs(oldName, newName) {
+    let touched = 0;
+    for (const f of mdFiles(dir('log'))) {
+      let text;
+      try { text = await v.cachedRead(f); } catch (e) { continue; }
+      if (!text.includes(oldName)) continue;
+      const { fm } = parseFrontmatter(text);
+      const fields = {};
+      let changed = false;
+      for (const k of ['done', 'skip', 'snooze', 'plan']) {
+        const arr = Array.isArray(fm[k]) ? fm[k] : null;
+        if (arr && arr.includes(oldName)) { fields[k] = arr.map(n => (n === oldName ? newName : n)); changed = true; }
+      }
+      if (!changed) continue;
+      stamp();
+      await v.process(f, t => patchFrontmatter(t, fields));
+      touched++;
+    }
+    return touched;
+  }
+
+  /* Rewrite oldName -> newName wherever an AREA is referenced: `area:`
+     (bare, or as the wikilink form Obsidian's own UI can write) in every
+     Practice, Goal and Event note. Goals hold no practice-name reference
+     anywhere (checked: `next` is free text, not a name), so a practice
+     rename never needs to touch Goals. Returns the count of notes touched. */
+  async function renameAreaRefs(oldName, newName) {
+    const wiki = `[[${oldName}]]`;
+    let touched = 0;
+    for (const key of ['practices', 'goals', 'events']) {
+      for (const f of mdFiles(dir(key))) {
+        let text;
+        try { text = await v.cachedRead(f); } catch (e) { continue; }
+        if (!text.includes(oldName)) continue;
+        const { fm } = parseFrontmatter(text);
+        let next;
+        if (fm.area === oldName) next = newName;
+        else if (fm.area === wiki) next = `[[${newName}]]`;
+        else continue;
+        stamp();
+        await v.process(f, t => patchFrontmatter(t, { area: next }));
+        touched++;
+      }
+    }
+    return touched;
+  }
+
   /* Rename a note in place (links elsewhere in the vault follow when the
-     host offers fileManager.renameFile). Returns the new path or null. */
+     host offers fileManager.renameFile), then rewrite every reference to
+     its old name (practice: log history; area: area: fields). Resolves to
+     { path, touched } on success, null when the target name is taken. */
   async function rename(path, newName) {
     const f = v.getFileByPath(path);
     if (!f) return null;
     const slash = path.lastIndexOf('/');
     const newPath = `${path.slice(0, slash)}/${safeName(newName)}.md`;
-    if (newPath === path) return path;
+    if (newPath === path) return { path, touched: 0 };
     if (existsCaseFolded(newPath) && newPath.toLowerCase() !== path.toLowerCase()) return null;
+    const oldName = baseName(f);
+    let kind;
+    try { kind = parseFrontmatter(await v.cachedRead(f)).fm.rhythm; } catch (e) { kind = undefined; }
     stamp();
     if (app.fileManager && app.fileManager.renameFile) await app.fileManager.renameFile(f, newPath);
     else await v.rename(f, newPath);
-    return newPath;
+    let touched = 0;
+    if (kind === 'practice') touched = await renamePracticeRefs(oldName, newName);
+    else if (kind === 'area') touched = await renameAreaRefs(oldName, newName);
+    return { path: newPath, touched };
   }
 
   /* Append a block to a note body without touching anything above it. */
   async function appendBody(path, block) {
     const f = v.getFileByPath(path);
     if (!f) return false;
-    const text = await v.read(f);
-    const sep = text.endsWith('\n') ? '\n' : '\n\n';
     stamp();
-    await v.modify(f, text + sep + block.replace(/\s+$/, '') + '\n');
+    await v.process(f, text => {
+      const sep = text.endsWith('\n') ? '\n' : '\n\n';
+      return text + sep + block.replace(/\s+$/, '') + '\n';
+    });
     return true;
   }
 
@@ -179,34 +248,82 @@ function makeStore(plugin) {
 
   const logPath = date => `${dir('log')}/${date}.md`;
 
-  async function readLog(date) {
-    const f = v.getFileByPath(logPath(date));
-    return { file: f, text: f ? await v.read(f) : buildNote({ rhythm: 'log' }, '') };
-  }
-
-  async function writeLog(date, text) {
-    await ensureTree();
-    const f = v.getFileByPath(logPath(date));
-    stamp();
-    if (f) await v.modify(f, text);
-    else await v.create(logPath(date), text);
+  /* Run fn(text) -> newText against an EXISTING or NOT-YET-EXISTING log
+     note, atomically. An existing note goes straight through vault.process
+     (host-queued per file since Obsidian 1.1). A note that doesn't exist
+     yet is the harder case: two quick taps on an empty day must not both
+     try to create it — so creation attempts for the same path are chained
+     on a promise queue, and if a create still loses the race (`exists`,
+     e.g. a write from outside this queue), we fall back to process on the
+     file that won. */
+  const createQueue = new Map();
+  async function processLog(date, fn) {
+    const path = logPath(date);
+    const existing = v.getFileByPath(path);
+    if (existing) { stamp(); await v.process(existing, fn); return; }
+    const prevTurn = createQueue.get(path) || Promise.resolve();
+    const myTurn = prevTurn.then(async () => {
+      await ensureTree();
+      const f2 = v.getFileByPath(path);
+      if (f2) { stamp(); await v.process(f2, fn); return; }
+      const content = fn(buildNote({ rhythm: 'log', done: [] }, ''));
+      stamp();
+      try {
+        await v.create(path, content);
+      } catch (e) {
+        const f3 = v.getFileByPath(path);
+        if (!f3) throw e;
+        await v.process(f3, fn);
+      }
+    });
+    createQueue.set(path, myTurn.catch(() => {}));
+    await myTurn;
   }
 
   /* Set one flag (done | skip | snooze | plan) for a practice on a day.
      A tick clears skip, snooze and the day's plan (the promise is kept);
-     a skip clears done; a plan clears skip and snooze. */
+     a skip clears done; a plan clears skip and snooze. Resolves to `prev`
+     — the four flags this name held BEFORE the change — so a caller can
+     undo the change exactly with restoreFlags. */
   async function setFlag(date, key, name, on) {
-    const { text } = await readLog(date);
-    const { fm } = parseFrontmatter(text);
-    const cur = { done: list(fm.done), skip: list(fm.skip), snooze: list(fm.snooze), plan: list(fm.plan) };
-    const toggle = (arr, add) => (add ? (arr.includes(name) ? arr : [...arr, name]) : arr.filter(n => n !== name));
-    cur[key] = toggle(cur[key], on);
-    if (key === 'done' && on) { cur.skip = toggle(cur.skip, false); cur.snooze = toggle(cur.snooze, false); cur.plan = toggle(cur.plan, false); }
-    if (key === 'skip' && on) { cur.done = toggle(cur.done, false); cur.plan = toggle(cur.plan, false); }
-    if (key === 'plan' && on) { cur.skip = toggle(cur.skip, false); cur.snooze = toggle(cur.snooze, false); }
-    const fields = { done: cur.done };
-    for (const k of ['skip', 'snooze', 'plan']) fields[k] = cur[k].length ? cur[k] : undefined;
-    await writeLog(date, patchFrontmatter(text, fields));
+    let prev;
+    await processLog(date, text => {
+      const { fm } = parseFrontmatter(text);
+      const cur = { done: list(fm.done), skip: list(fm.skip), snooze: list(fm.snooze), plan: list(fm.plan) };
+      prev = { done: cur.done.includes(name), skip: cur.skip.includes(name), snooze: cur.snooze.includes(name), plan: cur.plan.includes(name) };
+      const toggle = (arr, add) => (add ? (arr.includes(name) ? arr : [...arr, name]) : arr.filter(n => n !== name));
+      cur[key] = toggle(cur[key], on);
+      if (key === 'done' && on) { cur.skip = toggle(cur.skip, false); cur.snooze = toggle(cur.snooze, false); cur.plan = toggle(cur.plan, false); }
+      if (key === 'skip' && on) { cur.done = toggle(cur.done, false); cur.plan = toggle(cur.plan, false); }
+      if (key === 'plan' && on) { cur.skip = toggle(cur.skip, false); cur.snooze = toggle(cur.snooze, false); }
+      const fields = { done: cur.done };
+      for (const k of ['skip', 'snooze', 'plan']) fields[k] = cur[k].length ? cur[k] : undefined;
+      return patchFrontmatter(text, fields);
+    });
+    return { prev };
+  }
+
+  /* Put a name's four flags back exactly as `prev` describes — the actual
+     undo of a setFlag change (a plain setDone(false) is not enough: it
+     only clears done, not whatever setFlag's own side-effects cleared
+     alongside it, e.g. a plan a tick swallowed). */
+  async function restoreFlags(date, name, prev) {
+    await processLog(date, text => {
+      const { fm } = parseFrontmatter(text);
+      const cur = { done: list(fm.done), skip: list(fm.skip), snooze: list(fm.snooze), plan: list(fm.plan) };
+      const setBool = (arr, want) => {
+        const has = arr.includes(name);
+        if (want === has) return arr;
+        return want ? [...arr, name] : arr.filter(n => n !== name);
+      };
+      cur.done = setBool(cur.done, !!(prev && prev.done));
+      cur.skip = setBool(cur.skip, !!(prev && prev.skip));
+      cur.snooze = setBool(cur.snooze, !!(prev && prev.snooze));
+      cur.plan = setBool(cur.plan, !!(prev && prev.plan));
+      const fields = { done: cur.done };
+      for (const k of ['skip', 'snooze', 'plan']) fields[k] = cur[k].length ? cur[k] : undefined;
+      return patchFrontmatter(text, fields);
+    });
   }
 
   const setDone = (date, name, on) => setFlag(date, 'done', name, on);
@@ -253,7 +370,7 @@ function makeStore(plugin) {
 
   return {
     root, dir, load, ensureTree, createArea, createPractice, createGoal, createEvent,
-    patch, rename, appendBody, setDone, setSkip, setSnooze, setPlan, movePlan, ensureLogNote, appendLog, logPath,
+    patch, rename, appendBody, setDone, setSkip, setSnooze, setPlan, restoreFlags, movePlan, ensureLogNote, appendLog, logPath,
     completeGoalStep, seed, hasData, isOurs,
   };
 }
