@@ -310,11 +310,20 @@ function areaRank(areas) {
 
 const WHEN_ORDER = { morning: 0, day: 1, evening: 2, night: 3 };
 
+/* A clock time as a sortable key. Frontmatter keeps what was typed, so
+   `time: 9:00` arrives unpadded and, as text, sorts after "14:00"; the hour
+   is zero-padded here. Anything that is not H:MM is kept as written. */
+const clockKey = t => {
+  const s = String(t || '').trim();
+  const m = /^(\d{1,2}):(\d{2})$/.exec(s);
+  return m ? m[1].padStart(2, '0') + ':' + m[2] : s;
+};
+
 /* An untimed practice sorts after every timed one. The sentinel is a real
    late time rather than a punctuation mark, because localeCompare puts
    punctuation BEFORE digits and would have floated the untimed ones to the
    top of the morning. */
-const timeKey = p => p.time || '99:99';
+const timeKey = p => clockKey(p.time) || '99:99';
 const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 const WHEN_LABEL = { morning: 'Morning', day: 'During the day', evening: 'Evening', night: 'Before bed', '': 'Any time' };
 
@@ -410,19 +419,25 @@ function goalsWithoutStep(goals) {
   return sortGoals(goals).filter(g => !hasStep(g));
 }
 
-const eventKey = e => (e.date || '') + (e.time || '') + (e.name || '');
+/* Events by date; inside a day the all-day ones (no time) first, then by
+   clock time, then by name. One date+time+name string set an all-day
+   "Birthday" against the digits of "14:00", and "9:00" after "14:00". */
+const byEvent = (a, b) =>
+  cmp(a.date || '', b.date || '')
+  || cmp(clockKey(a.time), clockKey(b.time))
+  || (a.name || '').localeCompare(b.name || '');
 
 function upcoming(events, from, days) {
   const to = D.addDays(from, days);
   return (events || [])
     .filter(e => D.isISO(e.date) && e.date >= from && e.date <= to)
-    .sort((a, b) => eventKey(a).localeCompare(eventKey(b)));
+    .sort(byEvent);
 }
 
 function eventsInMonth(events, iso) {
   const key = D.monthKey(iso);
   return (events || []).filter(e => D.monthKey(e.date) === key)
-    .sort((a, b) => eventKey(a).localeCompare(eventKey(b)));
+    .sort(byEvent);
 }
 
 function goalsForMonth(goals, iso) {
@@ -556,8 +571,7 @@ function boardDays(data, from, n, opts) {
       .filter(p => isPlanned(data.log, date, p.name))
       .map(p => ({ p, pr: progress(p, data.log, date, weekStart) }))
       .sort((a, b) => a.p.name.localeCompare(b.p.name));
-    const dayEvents = events.filter(e => e.date === date)
-      .sort((a, b) => ((a.time || '') + a.name).localeCompare((b.time || '') + b.name));
+    const dayEvents = events.filter(e => e.date === date).sort(byEvent);
     const dailyCount = dailies.filter(p => {
       const days = parseDays(p.days);
       return !days.length || days.includes(D.dayKey(date));

@@ -157,6 +157,24 @@ const events = [
 assert.deepStrictEqual(M.upcoming(events, today, 8).map(e => e.name), ['Hike']);
 assert.deepStrictEqual(M.eventsInMonth(events, today).map(e => e.name), ['Past', 'Hike']);
 
+/* Inside a day: all-day events first (by name, so "10k race" and "Birthday"
+   both), then by clock time — frontmatter keeps "9:00" unpadded and it is
+   still before "14:00" — then by name. The next day comes after all of it. */
+{
+  const day = [
+    { name: 'Dentist', date: '2026-09-12', time: '14:00' },
+    { name: 'Aardvark day', date: '2026-09-13' },
+    { name: 'Birthday', date: '2026-09-12' },
+    { name: 'Coffee', date: '2026-09-12', time: '9:00' },
+    { name: '10k race', date: '2026-09-12', time: '' },
+    { name: 'Breakfast', date: '2026-09-12', time: '9:00' },
+    { name: 'Lunch', date: '2026-09-12', time: '09:30' },
+  ];
+  const want = ['10k race', 'Birthday', 'Breakfast', 'Coffee', 'Lunch', 'Dentist', 'Aardvark day'];
+  assert.deepStrictEqual(M.upcoming(day, today, 7).map(e => e.name), want, 'upcoming: all-day, then clock time, then name');
+  assert.deepStrictEqual(M.eventsInMonth(day, today).map(e => e.name), want, 'month: the same order');
+}
+
 /* ---- when was this last actually done ---- */
 assert.strictEqual(M.lastDone(log, 'Read the Bible', today), 0, 'ticked today');
 assert.strictEqual(M.lastDone(log, 'Exercise', today), 2, 'Wednesday, two days back');
@@ -186,6 +204,13 @@ assert.deepStrictEqual(
   M.planDay(timed, today, { focusCount: 3, weekStart: 1 }).focus.map(r => r.p.name),
   ['CrossFit', 'Stretch', 'Walk'],
   'earliest first, and anything untimed comes after everything timed');
+assert.deepStrictEqual(
+  M.planDay({ ...timed, practices: [
+    { name: 'Lunch walk', area: 'Body', cadence: 'daily', when: 'day', time: '14:00' },
+    { name: 'Stand up', area: 'Body', cadence: 'daily', when: 'day', time: '9:00' },
+  ] }, today, { focusCount: 3, weekStart: 1 }).focus.map(r => r.p.name),
+  ['Stand up', 'Lunch walk'],
+  'an unpadded 9:00 is still before 14:00');
 
 /* ---- M3: a brand-new practice must not borrow another practice's history ---- */
 {

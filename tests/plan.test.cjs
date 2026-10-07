@@ -52,6 +52,16 @@ const board = M.boardDays(d1, today, 7, { weekStart: 1, events: [{ name: 'Date n
 assert.strictEqual(board.length, 7);
 assert.deepStrictEqual(board.map(d => d.planned.map(r => r.p.name)), [[], ['Exercise'], [], [], ['Exercise', 'Paint'], [], []]);
 assert.deepStrictEqual(board[2].events.map(e => e.name), ['Date night']);
+/* A column's events: all-day first whatever the name, then by clock time
+   (an unpadded "9:00" before "14:00"), then by name. */
+const busy = M.boardDays(d1, today, 1, { weekStart: 1, events: [
+  { name: 'Dentist', date: today, time: '14:00' },
+  { name: 'Birthday', date: today, time: '' },
+  { name: 'Coffee', date: today, time: '9:00' },
+  { name: '10k race', date: today },
+  { name: 'Breakfast', date: today, time: '9:00' },
+] });
+assert.deepStrictEqual(busy[0].events.map(e => e.name), ['10k race', 'Birthday', 'Breakfast', 'Coffee', 'Dentist']);
 assert.strictEqual(board[0].dailyCount, 1, 'Mon: the plain daily only');
 assert.strictEqual(board[5].dailyCount, 2, 'Sat: the daily plus the Saturdays-only one');
 assert.strictEqual(board[4].load, 2);

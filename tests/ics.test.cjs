@@ -203,6 +203,14 @@ assert.deepStrictEqual(
 assert.deepStrictEqual(
   dt(parseICS(wrap(vev(['DTSTART;TZID=Asia/Tokyo:20261005T050000', 'RRULE:FREQ=WEEKLY;BYDAY=MO'])), '2026-10-04', '2026-10-04')),
   ['2026-10-04 22:00'], 'a one-day window finds an occurrence whose own date is the next day');
+/* One day's events: the all-day one first, whatever its name. */
+assert.deepStrictEqual(
+  parseICS(wrap([
+    'BEGIN:VEVENT\r\nUID:t\r\nSUMMARY:Dentist\r\nDTSTART:20260912T140000\r\nEND:VEVENT',
+    'BEGIN:VEVENT\r\nUID:b\r\nSUMMARY:Birthday\r\nDTSTART;VALUE=DATE:20260912\r\nEND:VEVENT',
+  ].join('\r\n')), '2026-09-01', '2026-09-30').map(e => e.name),
+  ['Birthday', 'Dentist'], 'all-day before timed on the same day');
+
 /* Floating times stay floating. */
 assert.deepStrictEqual(
   dt(parseICS(wrap(vev(['DTSTART:20261005T233000', 'RRULE:FREQ=WEEKLY;BYDAY=MO'])), '2026-10-01', '2026-10-31')),

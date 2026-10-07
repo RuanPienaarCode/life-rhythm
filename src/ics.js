@@ -478,7 +478,11 @@ function parseICS(text, from, to) {
     if (overrides) for (const ov of overrides) if (ov.recurrenceId) ev.exdates.add(ov.recurrenceId.date);
     add(ev);
   }
-  return events.sort((a, b) => (a.date + a.time + a.name).localeCompare(b.date + b.time + b.name));
+  /* All-day (time '') first on a day, then by time — always zero-padded
+     HH:MM here — then by name; one concatenated string set an all-day
+     name against the digits of a time. */
+  const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+  return events.sort((a, b) => cmp(a.date, b.date) || cmp(a.time, b.time) || a.name.localeCompare(b.name));
 }
 
 module.exports = { parseICS, parseStamp, parseRRule, unfold };
