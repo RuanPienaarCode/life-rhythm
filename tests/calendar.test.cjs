@@ -9,7 +9,7 @@ let mode = 'fail';
 const stub = { requestUrl: async () => (mode === 'fail' ? { status: 0, text: '' } : { status: 200, text: 'BEGIN:VCALENDAR\nBEGIN:VEVENT\nUID:x\nSUMMARY:Fresh\nDTSTART;VALUE=DATE:' + soon + '\nEND:VEVENT\nEND:VCALENDAR' }) };
 const orig = Module._load;
 Module._load = function (req, ...rest) { return req === 'obsidian' ? stub : orig.call(this, req, ...rest); };
-const { refreshCalendars, isStale } = require('../src/calendar');
+const { refreshCalendars, isStale, calendarStatusLine } = require('../src/calendar');
 Module._load = orig;
 
 (async () => {
@@ -54,6 +54,44 @@ Module._load = orig;
   assert.deepStrictEqual(names3, ['Family', 'OldChurch'], 'up link refreshed, down link kept its own previous events');
   assert.strictEqual(plugin2.settings.calendarCache.fetchedAt, 2000, 'fetchedAt left alone on partial failure — not marked fresh');
   assert.strictEqual(isStale2(plugin2), true, 'stays stale so the next open retries soon, not in 6h');
+
+  /* ---- the settings status line (pure) ---- */
+  const NOW = Date.UTC(2026, 9, 7, 12, 0, 0);
+  const min = n => NOW - n * 60000;
+  assert.strictEqual(calendarStatusLine(null, NOW), 'Not fetched yet.');
+  assert.strictEqual(calendarStatusLine({}, NOW), 'Not fetched yet.');
+  assert.strictEqual(calendarStatusLine({ events: [], errors: [] }, NOW), 'Not fetched yet.');
+  assert.strictEqual(
+    calendarStatusLine({ fetchedAt: min(5), lastAttemptAt: min(5), events: [{}, {}], errors: [] }, NOW),
+    '2 events cached, fetched 5 min ago.');
+  assert.strictEqual(
+    calendarStatusLine({ fetchedAt: min(1), lastAttemptAt: min(1), events: [{}], errors: [] }, NOW),
+    '1 event cached, fetched 1 min ago.');
+  /* Never succeeded, last attempt failed: say so, never "Not fetched yet". */
+  const failedFirst = calendarStatusLine({ lastAttemptAt: min(3), events: [], errors: ['a: HTTP 503', 'b: HTTP ?'] }, NOW);
+  assert.strictEqual(failedFirst, "Couldn't load: 2 link(s) — last tried 3 min ago.");
+  assert.ok(!/Not fetched/.test(failedFirst));
+  assert.strictEqual(
+    calendarStatusLine({ lastAttemptAt: NOW - 20000, events: [], errors: ['a: HTTP 503'] }, NOW),
+    "Couldn't load: 1 link(s) — last tried just now.");
+  assert.strictEqual(calendarStatusLine({ events: [], errors: ['a: x'] }, NOW), "Couldn't load: 1 link(s).",
+    'a cache from before lastAttemptAt existed still reports the failure');
+  /* Earlier success, latest attempt failed: events stay, failure is named. */
+  assert.strictEqual(
+    calendarStatusLine({ fetchedAt: min(180), lastAttemptAt: min(10), events: [{}, {}, {}], errors: ['a: HTTP 500'] }, NOW),
+    "3 events cached, fetched 3 h ago · couldn't load 1 link(s), last tried 10 min ago.");
+  assert.strictEqual(
+    calendarStatusLine({ fetchedAt: min(60 * 24 * 3), lastAttemptAt: min(60 * 24 * 3), events: [], errors: [] }, NOW),
+    '0 events cached, fetched 3 d ago.');
+  /* The real refresh paths feed it: all links down on a fresh install. */
+  Module._load = function (req, ...rest) { return req === 'obsidian' ? { requestUrl: async () => ({ status: 500, text: '' }) } : orig.call(this, req, ...rest); };
+  delete require.cache[require.resolve('../src/calendar')];
+  const cal3 = require('../src/calendar');
+  Module._load = orig;
+  const fresh = { settings: { calendarUrls: 'https://x.example/a.ics', calendarCache: null }, async saveSettings() {} };
+  await cal3.refreshCalendars(fresh);
+  assert.ok(/^Couldn't load: 1 link\(s\) — last tried just now\.$/.test(cal3.calendarStatusLine(fresh.settings.calendarCache, Date.now())),
+    'first-ever refresh that fails reports the failure');
 
   console.log('calendar OK');
 })().catch(e => { console.error(e); process.exit(1); });

@@ -11,6 +11,8 @@
 
 const FM_LAYOUT = Symbol.for('rv.fmLayout');
 const FM_EOL = Symbol.for('rv.fmEol');
+const FM_GAP = Symbol.for('rv.fmGap');
+const FM_BOM = Symbol.for('rv.fmBom');
 
 /* Which line ending the note already uses — preserved on write so a CRLF
    file never comes back with mixed endings. */
@@ -20,22 +22,35 @@ function detectEOL(text) {
 }
 
 /* An unquoted scalar's trailing ` # comment` is a YAML comment, not part of
-   the value — but only OUTSIDE quotes, so `"3/week # was"` keeps its hash.
+   the value. Two things make a `#` NOT a comment: it sits inside quotes, or
+   it sits inside a `[[wikilink #heading]]`. A quote character only OPENS a
+   quoted span when it is the first non-space character of the scalar (or of
+   a flow-list item) — an apostrophe in `Mom's day # note` is just text, and
+   treating it as an opener swallowed the comment into the value.
    Char-by-char (no lookbehind). */
 function stripComment(s) {
-  let quote = null;
+  let i0 = 0;
+  while (i0 < s.length && (s[i0] === ' ' || s[i0] === '\t')) i0++;
+  const flow = s[i0] === '[' && s[i0 + 1] !== '[';
+  let quote = null, atStart = true, wiki = 0;
   for (let i = 0; i < s.length; i++) {
     const ch = s[i];
     if (quote) {
+      if (quote === '"' && ch === '\\') { i++; continue; }
       if (ch === quote) {
-        if (quote === '"' && s[i - 1] === '\\') continue;
         if (quote === "'" && s[i + 1] === "'") { i++; continue; }
         quote = null;
       }
       continue;
     }
-    if (ch === '"' || ch === "'") { quote = ch; continue; }
-    if (ch === '#' && i > 0 && s[i - 1] === ' ') return s.slice(0, i - 1);
+    if (ch === ' ' || ch === '\t') continue;
+    if (ch === '#' && wiki === 0 && i > 0 && (s[i - 1] === ' ' || s[i - 1] === '\t')) return s.slice(0, i).replace(/[ \t]+$/, '');
+    if (atStart && (ch === '"' || ch === "'")) { quote = ch; atStart = false; continue; }
+    if (ch === '[' && s[i + 1] === '[') { wiki++; i++; atStart = false; continue; }
+    if (ch === ']' && s[i + 1] === ']' && wiki > 0) { wiki--; i++; continue; }
+    if (flow && i === i0) { atStart = true; continue; }
+    if (flow && ch === ',' && wiki === 0) { atStart = true; continue; }
+    atStart = false;
   }
   return s;
 }
@@ -65,8 +80,10 @@ function unquote(s) {
 }
 
 /* Split an inline list on commas OUTSIDE quotes (char-by-char; no
-   lookbehind). Tracks whichever quote character opened, single or double,
-   so a comma or the other quote character inside it is not a delimiter. */
+   lookbehind). A quote opens one only as the FIRST non-space character of an
+   item, so `[Mom's call, Read]` is two plain items. Once open, whichever
+   quote character opened closes it, so a comma or the other quote character
+   inside is not a delimiter. */
 function splitListItems(inner) {
   const items = [];
   let cur = '', quote = null;
@@ -74,14 +91,14 @@ function splitListItems(inner) {
     const ch = inner[i];
     if (quote) {
       cur += ch;
+      if (quote === '"' && ch === '\\' && i + 1 < inner.length) { cur += inner[++i]; continue; }
       if (ch === quote) {
-        if (quote === '"' && inner[i - 1] === '\\') continue;
         if (quote === "'" && inner[i + 1] === "'") { cur += inner[++i]; continue; }
         quote = null;
       }
       continue;
     }
-    if (ch === '"' || ch === "'") { quote = ch; cur += ch; continue; }
+    if ((ch === '"' || ch === "'") && cur.trim() === '') { quote = ch; cur += ch; continue; }
     if (ch === ',') { items.push(cur); cur = ''; continue; }
     cur += ch;
   }
@@ -109,26 +126,68 @@ function unquoteBlockItem(line) {
   return unquote(line.replace(/^\s*-\s?/, '').trim());
 }
 
+/* Locate the frontmatter block. The closing fence must be a line of its own
+   starting in column 0 (`---`, trailing blanks allowed) — NOT any `---`
+   that happens to end a value (`next: write intro ---`) and not an indented
+   one inside a `|` block scalar. Returns { head, rest } or null. */
+function findFence(text) {
+  const open = /^---\r?\n/.exec(text);
+  if (!open) return null;
+  const start = open[0].length;
+  let pos = start;
+  for (;;) {
+    const nl = text.indexOf('\n', pos);
+    const end = nl < 0 ? text.length : nl;
+    let line = text.slice(pos, end);
+    if (line.length && line.charCodeAt(line.length - 1) === 13) line = line.slice(0, -1);
+    if (/^---[ \t]*$/.test(line)) {
+      const head = text.slice(start, pos).replace(/\r?\n$/, '');
+      return { head, rest: nl < 0 ? '' : text.slice(nl + 1) };
+    }
+    if (nl < 0) return null;
+    pos = nl + 1;
+  }
+}
+
+const cloneVal = v => (Array.isArray(v) ? v.slice() : v);
+
+/* Do two parsed values mean the same thing? Strings, numbers, or lists of
+   strings — nothing nested is ever modelled. */
+function sameValue(a, b) {
+  if (Array.isArray(a) || Array.isArray(b)) {
+    return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((x, i) => x === b[i]);
+  }
+  return a === b;
+}
+
+/* Layout: the frontmatter as an ordered list of parts. A `raw` part is lines
+   the model does not understand (comments, nested maps, block scalars),
+   passed through verbatim. A `key` part is one modelled key together with
+   the EXACT source lines it came from (`lines`) and the value they parsed to
+   (`orig`) — so a patch that leaves a key's value alone writes its original
+   lines back byte-for-byte, whatever quoting, brackets or block form it
+   used. Only a key whose value actually changed is re-serialised. */
 function parseFrontmatter(rawText) {
   /* A leading BOM (Universal Clipboard / some external editors) must not
      stop the fence from matching — that would push the whole frontmatter
-     block into the body instead of losing just the BOM. */
-  const text = (rawText || '').replace(/^﻿/, '');
+     block into the body instead of losing just the BOM. It is remembered
+     and written back. */
+  const raw0 = rawText || '';
+  const bom = raw0.charCodeAt(0) === 0xFEFF ? '﻿' : '';
+  const text = bom ? raw0.slice(1) : raw0;
   const eol = detectEOL(text);
-  /* The `(?:\r?\n)?` before the closing fence (rather than a required
-     `\r?\n`) is what lets `---\n---` match at all: with a required
-     newline on both sides of the capture, an EMPTY frontmatter block has
-     nowhere for both to fit — they would need the same one `\n` twice. */
-  const m = text.match(/^---\r?\n([\s\S]*?)(?:\r?\n)?---(?:\r?\n|$)/);
+  const fence = findFence(text);
   const fm = {};
   const layout = [];
-  if (m) {
-    const lines = m[1] === '' ? [] : m[1].split(/\r?\n/);
+  let gap, body;
+  if (fence) {
+    const lines = fence.head === '' ? [] : fence.head.split(/\r?\n/);
     const raw = line => {
       const last = layout[layout.length - 1];
       if (last && last.kind === 'raw') last.lines.push(line);
       else layout.push({ kind: 'raw', lines: [line] });
     };
+    const isItem = l => /^\s*-(\s|$)/.test(l);
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       if (/^\s/.test(line) || /^-\s/.test(line) || /^#/.test(line) || line.trim() === '') { raw(line); continue; }
@@ -138,29 +197,67 @@ function parseFrontmatter(rawText) {
       const rest = line.slice(ci + 1).trim();
       const next = lines[i + 1] ?? '';
       /* A block sequence — `key:` with nothing after it, followed by
-         indented `- item` lines, the form Obsidian's own Properties panel
-         writes for a list property. The WHOLE block (key line + every
-         continuation line) collapses into ONE layout slot, so writing
-         this key back replaces all of it — never leaves stray `- item`
-         lines behind to form a duplicate key. */
-      if (rest === '' && /^\s+-(\s|$)/.test(next)) {
+         `- item` lines, indented (the form Obsidian's own Properties panel
+         writes) or not (js-yaml / Python's default). The WHOLE block (key
+         line + every item line) is ONE layout slot, so writing this key
+         back replaces all of it — never leaves stray `- item` lines behind
+         to form a duplicate key. */
+      if (rest === '' && isItem(next)) {
         const items = [];
         let j = i + 1;
-        while (j < lines.length && /^\s+-(\s|$)/.test(lines[j])) { items.push(unquoteBlockItem(lines[j])); j++; }
+        while (j < lines.length && isItem(lines[j])) { items.push(unquoteBlockItem(lines[j])); j++; }
         fm[key] = items;
-        layout.push({ kind: 'key', key });
+        layout.push({ kind: 'key', key, lines: lines.slice(i, j), orig: items.slice() });
         i = j - 1;
+        continue;
+      }
+      /* An empty value — `key:`, `key: null`, `key: ~` — is a modelled key
+         holding null (what Obsidian's Properties panel leaves for an
+         emptied list), so a patch replaces THIS line instead of adding a
+         second one. Only when nothing indented follows: that is a nested
+         map, which stays raw. */
+      const bare = stripComment(rest).trim();
+      if ((bare === '' || bare === 'null' || bare === '~') && !/^\s+\S/.test(next)) {
+        fm[key] = null;
+        layout.push({ kind: 'key', key, lines: [line], orig: null });
         continue;
       }
       if (rest === '' || rest === '>' || rest === '|' || /^\s+\S/.test(next)) { raw(line); continue; }
       fm[key] = parseScalar(rest);
-      layout.push({ kind: 'key', key });
+      layout.push({ kind: 'key', key, lines: [line], orig: cloneVal(fm[key]) });
     }
+    const g = /^(?:\r?\n)+/.exec(fence.rest);
+    gap = g ? g[0] : '';
+    body = fence.rest.slice(gap.length);
+  } else {
+    gap = eol;
+    body = text;
   }
-  Object.defineProperty(fm, FM_LAYOUT, { value: layout, enumerable: false, writable: true, configurable: true });
-  Object.defineProperty(fm, FM_EOL, { value: eol, enumerable: false, writable: true, configurable: true });
-  const body = m ? text.slice(m[0].length).replace(/^(\r?\n)+/, '') : text;
+  const hide = (k, value) => Object.defineProperty(fm, k, { value, enumerable: false, writable: true, configurable: true });
+  hide(FM_LAYOUT, layout);
+  hide(FM_EOL, eol);
+  hide(FM_GAP, gap);
+  hide(FM_BOM, bom);
   return { fm, body };
+}
+
+/* Where each of `keys` sits in a note right now, so a later patch can put
+   it back EXACTLY: { pos (ordinal among the modelled keys), lines (the raw
+   source lines), value (what they parse to, through `norm` if given) } or
+   null when the key is absent. Handed to patchFrontmatter as opts.restore. */
+function captureKeys(text, keys, norm) {
+  const layout = parseFrontmatter(text).fm[FM_LAYOUT];
+  const out = {};
+  for (const k of keys) out[k] = null;
+  let ord = 0;
+  for (const part of layout) {
+    if (part.kind !== 'key') continue;
+    if (keys.includes(part.key) && out[part.key] === null) {
+      out[part.key] = { pos: ord, lines: part.lines.slice(), value: norm ? norm(part.orig) : cloneVal(part.orig) };
+    }
+    ord++;
+  }
+  return out;
 }
 
 /* Quote a scalar for YAML only when it would otherwise change meaning. */
@@ -188,42 +285,75 @@ function yamlVal(v) {
   return yamlStr(v);
 }
 
-/* Re-emit modelled keys in their original position, raw lines verbatim, and
-   any NEW key (not in the layout) at the end. Keys set to undefined are
-   dropped. */
-function serializeFrontmatter(fm) {
+/* Re-emit the frontmatter: parts in their original order, a key whose value
+   is unchanged as its ORIGINAL lines, a changed key re-serialised, raw lines
+   verbatim, and any NEW key (not in the layout) at the end. Keys set to
+   undefined are dropped.
+   opts.restore = { key: { pos, lines, value } } (see captureKeys) puts a key
+   that is absent now back at its old ordinal position, and uses its old
+   lines when the value being written equals the old value. */
+function serializeFrontmatter(fm, opts) {
   const layout = fm[FM_LAYOUT] || [];
   const eol = fm[FM_EOL] || '\n';
-  const out = [];
+  const restore = (opts && opts.restore) || {};
+  const parts = [];
   const seen = new Set();
   for (const part of layout) {
-    if (part.kind === 'raw') { out.push(...part.lines); continue; }
+    if (part.kind === 'raw') { parts.push({ lines: part.lines }); continue; }
     seen.add(part.key);
-    if (fm[part.key] === undefined) continue;
-    out.push(`${part.key}: ${yamlVal(fm[part.key])}`);
+    const v = fm[part.key];
+    if (v === undefined) continue;
+    const snap = restore[part.key];
+    const lines = sameValue(v, part.orig) ? part.lines
+      : snap && sameValue(v, snap.value) ? snap.lines
+        : [`${part.key}: ${yamlVal(v)}`];
+    parts.push({ key: part.key, lines });
   }
+  const fresh = [];
   for (const [k, v] of Object.entries(fm)) {
     if (seen.has(k) || v === undefined) continue;
-    out.push(`${k}: ${yamlVal(v)}`);
+    const snap = restore[k];
+    fresh.push({
+      key: k,
+      pos: snap && Number.isInteger(snap.pos) ? snap.pos : null,
+      lines: snap && sameValue(v, snap.value) ? snap.lines : [`${k}: ${yamlVal(v)}`],
+    });
   }
-  return `---${eol}${out.join(eol)}${eol}---${eol}`;
+  fresh.filter(f => f.pos !== null).sort((a, b) => a.pos - b.pos).forEach(f => {
+    let n = 0, at = -1;
+    for (let i = 0; i < parts.length; i++) {
+      if (parts[i].key === undefined) continue;
+      if (n === f.pos) { at = i; break; }
+      n++;
+    }
+    const item = { key: f.key, lines: f.lines };
+    if (at < 0) parts.push(item); else parts.splice(at, 0, item);
+  });
+  fresh.filter(f => f.pos === null).forEach(f => parts.push({ key: f.key, lines: f.lines }));
+  const out = [];
+  for (const p of parts) out.push(...p.lines);
+  return `---${eol}${out.length ? out.join(eol) + eol : ''}---${eol}`;
 }
 
 /* A note read as CRLF must be written back CRLF, never a mix of the two —
    the body is passed through verbatim (untouched, whatever endings it
-   already has); only the separator between the fence and the body needs
-   to match. */
-function buildNote(fm, body) {
+   already has). The gap between the closing fence and the body (zero, one
+   or several blank lines) is the note's own and is kept as found; a note
+   built from scratch gets one blank line. */
+function buildNote(fm, body, opts) {
   const eol = fm[FM_EOL] || '\n';
-  const b = (body || '').replace(/^(\r?\n)+/, '');
-  return serializeFrontmatter(fm) + (b ? eol + b : '');
+  let gap, b;
+  if (fm[FM_GAP] !== undefined) { gap = fm[FM_GAP]; b = body || ''; }
+  else { b = (body || '').replace(/^(\r?\n)+/, ''); gap = b ? eol : ''; }
+  return (fm[FM_BOM] || '') + serializeFrontmatter(fm, opts) + gap + b;
 }
 
-/* Patch keys in an existing note's frontmatter, leaving the body untouched. */
-function patchFrontmatter(text, patch) {
+/* Patch keys in an existing note's frontmatter, leaving the body and every
+   other key's source lines untouched. */
+function patchFrontmatter(text, patch, opts) {
   const { fm, body } = parseFrontmatter(text);
   for (const [k, v] of Object.entries(patch)) fm[k] = v;
-  return buildNote(fm, body);
+  return buildNote(fm, body, opts);
 }
 
 /* Windows/macOS-illegal filename characters folded to '-'. */
@@ -232,4 +362,4 @@ function safeName(s) {
   return cleaned.slice(0, 200).trim() || '-';
 }
 
-module.exports = { parseFrontmatter, serializeFrontmatter, buildNote, patchFrontmatter, yamlStr, safeName, FM_LAYOUT };
+module.exports = { parseFrontmatter, serializeFrontmatter, buildNote, patchFrontmatter, captureKeys, detectEOL, yamlStr, safeName, FM_LAYOUT };

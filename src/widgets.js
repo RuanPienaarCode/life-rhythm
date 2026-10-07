@@ -6,6 +6,7 @@ const { Menu } = require('obsidian');
 const { el, button, icon } = require('./dom');
 const D = require('./dates');
 const M = require('./model');
+const { dayOptions, moveFrom } = require('./day-menu');
 
 /* Large title block: an uppercase eyebrow line, then the title. */
 function titleBar(page, eyebrow, title, o) {
@@ -39,16 +40,14 @@ function horizonLabel(h) {
   return `by ${s}`;
 }
 
-/* "Another day": the next seven, named the way a person would say them.
-   Picking one writes a plan for that day, which quietly takes the practice
-   off today — see model.planDay. */
-function dayMenu(ev, anchor, ctx, name, from, after) {
+/* "Another day": the days left in the practice's own week or month, named
+   the way a person would say them. Picking one MOVES the promise there —
+   it leaves the day being viewed — see model.planDay and day-menu.js. */
+function dayMenu(ev, anchor, ctx, r, date, after) {
   const menu = new Menu();
-  for (let i = 1; i <= 7; i++) {
-    const d = D.addDays(from, i);
-    const label = `${D.relative(d, from)} · ${D.fmtShort(d)}`;
-    menu.addItem(m => m.setTitle(label).setIcon('calendar').onClick(() => {
-      if (after) after(d); else ctx.movePlan(name, null, d);
+  for (const o of dayOptions(r.p, date, ctx.settings.weekStart)) {
+    menu.addItem(m => m.setTitle(o.label).setIcon('calendar').onClick(() => {
+      if (after) after(o.date); else ctx.movePlan(r.p.name, moveFrom(r.pr, date), o.date);
     }));
   }
   if (ev && ev.clientX !== undefined && menu.showAtMouseEvent) menu.showAtMouseEvent(ev);
@@ -65,8 +64,10 @@ function rowMenu(ev, ctx, r, date) {
     if (!pr.skippedToday) {
       menu.addItem(i => i.setTitle(pr.snoozed ? 'Bring it forward' : 'Later today').setIcon('clock')
         .onClick(() => ctx.snooze(p.name, date, !pr.snoozed)));
-      menu.addItem(i => i.setTitle('Another day').setIcon('calendar')
-        .onClick(() => window.setTimeout(() => dayMenu(null, ev && ev.target, ctx, p.name, date), 0)));
+      if (dayOptions(p, date, ctx.settings.weekStart).length) {
+        menu.addItem(i => i.setTitle('Another day').setIcon('calendar')
+          .onClick(() => window.setTimeout(() => dayMenu(null, ev && ev.target, ctx, r, date), 0)));
+      }
     }
   }
   menu.addItem(i => i.setTitle('Edit').setIcon('pencil').onClick(() => ctx.edit('practice', p)));

@@ -53,23 +53,24 @@ assert.strictEqual(rb.due, false);
 assert.strictEqual(M.progress(practices[5], log, today, 1).due, false);
 assert.strictEqual(M.progress(practices[5], log, '2026-09-12', 1).due, true);
 
-/* ---- spread: one per area first among pressing rows ----
+/* ---- focus order is AREA order ----
    Due: guitar (Craft, 1.0), Journal (Faith, 1.0), Exercise (Body, .67),
-   Paint (Craft, .33), Range (Craft, .05). The first pass takes the best
-   pressing row of each area in urgency-then-priority order: Journal
-   (Faith), guitar (Craft) — both urgency 1, Faith ranks first — then
-   Exercise (Body). Range (not pressing) waits. */
+   Paint (Craft, .33), Range (Craft, .05). The first pass walks the areas in
+   the user's priority — Faith, Body, Craft — and takes each one's most
+   pressing row: Journal, Exercise, guitar. (Before Ruan's 7 Oct 2026
+   decision this ran in urgency order: Journal, guitar, Exercise.) Range
+   (not pressing) waits. */
 const plan = M.planDay(data, today, { focusCount: 3, weekStart: 1 });
-assert.deepStrictEqual(plan.focus.map(r => r.p.name), ['Journal', 'Practice guitar', 'Exercise']);
+assert.deepStrictEqual(plan.focus.map(r => r.p.name), ['Journal', 'Exercise', 'Practice guitar']);
 assert.deepStrictEqual(plan.later.map(r => r.p.name), ['Paint', 'Range']);
 assert.deepStrictEqual(plan.done.map(r => r.p.name), ['Read the Bible']);
 
 /* With four slots the second Craft item (Paint, pressing) joins before
    Range (not pressing). With two slots Body still gets in ahead of a
    second Faith or Craft item. */
-assert.deepStrictEqual(M.planDay(data, today, { focusCount: 4, weekStart: 1 }).focus.map(r => r.p.name), ['Journal', 'Practice guitar', 'Exercise', 'Paint']);
+assert.deepStrictEqual(M.planDay(data, today, { focusCount: 4, weekStart: 1 }).focus.map(r => r.p.name), ['Journal', 'Exercise', 'Practice guitar', 'Paint']);
 const two = { ...data, practices: [...practices, { name: 'Pray', area: 'Faith', cadence: 'daily', when: 'morning' }] };
-assert.deepStrictEqual(M.planDay(two, today, { focusCount: 3, weekStart: 1 }).focus.map(r => r.p.name), ['Pray', 'Practice guitar', 'Exercise'], 'second Faith daily (Journal) yields to Body');
+assert.deepStrictEqual(M.planDay(two, today, { focusCount: 3, weekStart: 1 }).focus.map(r => r.p.name), ['Pray', 'Exercise', 'Practice guitar'], 'second Faith daily (Journal) yields to Body');
 
 /* Three Faith dailies and nothing else pressing → all three show. */
 const faithOnly = { areas, practices: [practices[0], practices[6], { name: 'Pray', area: 'Faith', cadence: 'daily' }], goals: [], events: [], log: new Map() };
@@ -93,12 +94,11 @@ assert.strictEqual(M.progress(practices[3], log4, '2026-09-11', 1).snoozed, fals
 
 /* ---- reasons ---- */
 assert.strictEqual(plan.focus.find(r => r.p.name === 'Exercise').reason, '2 more this week · 3 days left');
-/* Journal has never once appeared in this log (no done/skip/snooze/plan
-   entry, no `created`) — with no evidence of its own history it starts
-   today, not on the log's overall first date (that belonged to other
-   practices). See the dedicated M3 block below for the borrowed-history
-   regression this guards. */
-assert.strictEqual(plan.focus.find(r => r.p.name === 'Journal').reason, 'Every day', 'no history of its own → not a borrowed "Missed 4 days"');
+/* Journal has never once appeared in this log and has no `created`: a
+   LEGACY note, asked since the log began (9 Sep 07), so 10th, 9th, 8th and
+   7th were all missed. (A practice made today has `created`; see the M3
+   block below.) */
+assert.strictEqual(plan.focus.find(r => r.p.name === 'Journal').reason, 'Missed 4 days', 'legacy: counts from when the log began');
 assert.strictEqual(M.reasonFor(practices[5], M.progress(practices[5], log, '2026-09-12', 1), log, '2026-09-12'), 'Saturdays');
 const lastChance = M.progress(practices[3], log, '2026-09-13', 1);
 assert.strictEqual(M.reasonFor(practices[3], lastChance, log, '2026-09-13'), 'Last chance this week');
@@ -107,7 +107,7 @@ assert.strictEqual(M.reasonFor(practices[0], rb, log, today), 'Done');
 /* ---- grouping by time of day ---- */
 const groups = M.groupByWhen(plan.focus);
 assert.deepStrictEqual(groups.map(g => g.label), ['Evening', 'Before bed']);
-assert.deepStrictEqual(groups[0].rows.map(r => r.p.name), ['Practice guitar', 'Exercise']);
+assert.deepStrictEqual(groups[0].rows.map(r => r.p.name), ['Exercise', 'Practice guitar']);
 
 /* ---- summaries ---- */
 const ws = M.weekSummary(data, today, 1);
@@ -119,7 +119,10 @@ const ms = M.monthSummary(data, today, 1);
 assert.strictEqual(ms.find(r => r.p.name === 'Exercise').target, 16);
 assert.strictEqual(ms.find(r => r.p.name === 'Sabbath walk').target, 4);
 
-const rev = M.weekReview(data, today, 1);
+/* The review applies the same "existed for the whole week" rule as the
+   good-weeks streak, so give the fixture practices a start before the week. */
+const established = { ...data, practices: practices.map(p => ({ ...p, created: '2026-09-01' })) };
+const rev = M.weekReview(established, today, 1, today);
 assert.strictEqual(rev.asked, 7 + 4 + 7 + 1 + 1 + 7, 'three dailies ×7, Exercise 4, Paint 1, Sabbath 1');
 assert.strictEqual(rev.done, 3 + 2);
 assert.strictEqual(rev.slipped[0].done, 0);
@@ -163,7 +166,11 @@ assert.strictEqual(M.sinceLabel(1), 'done yesterday');
 assert.strictEqual(M.sinceLabel(5), '5 days ago');
 assert.strictEqual(M.sinceLabel(21), '3 weeks ago');
 assert.strictEqual(M.sinceLabel(75), '3 months ago');
-assert.strictEqual(M.sinceLabel(null), 'not in 90 days');
+assert.strictEqual(M.sinceLabel(null), 'not yet', 'never done, start unknown: not the cold "not in 90 days"');
+assert.strictEqual(M.sinceLabel(null, 90, 3), 'new');
+assert.strictEqual(M.sinceLabel(null, 90, 14), 'new');
+assert.strictEqual(M.sinceLabel(null, 90, 40), 'not yet');
+assert.strictEqual(M.sinceLabel(null, 90, 91), 'not in 90 days', 'only a practice older than the window may say so');
 
 /* ---- a clock time orders things inside a part of the day ---- */
 const timed = {
@@ -185,9 +192,12 @@ assert.deepStrictEqual(
   const freshLog = new Map();
   for (let i = 1; i <= 60; i++) freshLog.set(D.addDays('2026-09-11', -i), E(['Read the Bible']));
   const stretch = { name: 'Stretch', area: 'Body', cadence: 'daily' };
-  assert.strictEqual(M.missedRun(stretch, freshLog, '2026-09-11'), 0, 'no tick and no created → starts today, not "Missed 7 days"');
-  const pr = M.progress(stretch, freshLog, '2026-09-11', 1);
-  assert.strictEqual(M.reasonFor(stretch, pr, freshLog, '2026-09-11'), 'Every day', 'the normal cadence text, per the promise at model.js:153');
+  assert.strictEqual(M.missedRun(stretch, freshLog, '2026-09-11'), 7, 'LEGACY (no created): counts from when the log began');
+  const fresh = { name: 'Stretch', area: 'Body', cadence: 'daily', created: '2026-09-11' };
+  assert.strictEqual(M.missedRun(fresh, freshLog, '2026-09-11'), 0, 'made today (created=today) → starts today, not "Missed 7 days"');
+  const pr = M.progress(fresh, freshLog, '2026-09-11', 1);
+  assert.strictEqual(M.reasonFor(fresh, pr, freshLog, '2026-09-11'), 'Every day', 'the normal cadence text');
+  assert.strictEqual(M.missedRun(stretch, new Map(), '2026-09-11'), 0, 'empty log: nothing to have missed');
   /* With a `created` date it counts back to THAT, not to today and not to
      some other practice's 60-day log. */
   const created = { name: 'Stretch', area: 'Body', cadence: 'daily', created: '2026-09-08' };
@@ -198,13 +208,14 @@ assert.deepStrictEqual(
 {
   const faithAreas = [{ name: 'Faith', order: 1 }];
   const base = [{ name: 'Read', area: 'Faith', cadence: 'daily' }];
+  const madeToday = { created: '2026-09-11' };
   const weekLog = new Map();
   for (let i = 0; i < 35; i++) weekLog.set(D.addDays('2026-09-11', -i), E(['Read']));
   const before = M.weekStreak({ areas: faithAreas, practices: base, log: weekLog }, '2026-09-11', 1);
-  const withNew = [...base, { name: 'Stretch', area: 'Faith', cadence: 'daily' }, { name: 'Journal', area: 'Faith', cadence: 'daily' }];
+  const withNew = [...base, { name: 'Stretch', area: 'Faith', cadence: 'daily', ...madeToday }, { name: 'Journal', area: 'Faith', cadence: 'daily', ...madeToday }];
   const after = M.weekStreak({ areas: faithAreas, practices: withNew, log: weekLog }, '2026-09-11', 1);
   assert.strictEqual(before, 5, '35 perfect days = 5 good weeks');
-  assert.strictEqual(after, before, 'two new daily practices with no history yet must not zero out the streak');
+  assert.strictEqual(after, before, 'two daily practices made today (created=today) must not zero out the streak');
 }
 
 /* ---- day streak: an unticked "today" shows the run through yesterday ---- */
@@ -215,6 +226,180 @@ assert.deepStrictEqual(
   assert.strictEqual(M.streakLabel({ log: dayLog }, '2026-09-11', {}), '10 days in a row', 'nothing ticked yet today still reads as the 10-day run through yesterday');
   dayLog.set('2026-09-10', E([])); // yesterday itself blank now — the run really is broken
   assert.strictEqual(M.streakLabel({ log: dayLog }, '2026-09-11', {}), '', 'a whole blank PAST day does break it');
+}
+
+/* ---- planWindow: the days "Another day" may move a practice to ----
+   Only days after `date` inside the practice's CURRENT period; none for a
+   daily (its period is the day itself); a days:-narrowed practice only
+   offers its own weekdays. 2026-10-07 is a Wednesday. */
+assert.deepStrictEqual(M.planWindow({ cadence: 'daily' }, '2026-10-07', 1), []);
+assert.deepStrictEqual(M.planWindow({ cadence: '3/week' }, '2026-10-07', 1), ['2026-10-08', '2026-10-09', '2026-10-10', '2026-10-11']);
+assert.deepStrictEqual(M.planWindow({ cadence: 'weekly' }, '2026-10-11', 1), [], 'Sunday is the last day of a Monday week');
+assert.deepStrictEqual(M.planWindow({ cadence: 'weekly' }, '2026-10-07', 0), ['2026-10-08', '2026-10-09', '2026-10-10']);
+assert.deepStrictEqual(M.planWindow({ cadence: 'weekly', days: ['sat', 'tue'] }, '2026-10-07', 1), ['2026-10-10']);
+assert.deepStrictEqual(M.planWindow({ cadence: 'monthly' }, '2026-10-29', 1), ['2026-10-30', '2026-10-31']);
+
+/* ---- item 1: Today's slots go to the areas in priority order ----
+   Ruan's real areas: Faith 1, People 2, Future 3, Mind lower. Wed 7 Oct,
+   week Mon–Sun. A Future 3/week practice with 3 owed and 5 days left
+   (urgency .6) must take a slot over the Mind daily (urgency 1). */
+{
+  const T = '2026-10-07';
+  const ar = [{ name: 'Faith', order: 1 }, { name: 'People', order: 2 }, { name: 'Future', order: 3 }, { name: 'Body', order: 4 }, { name: 'Mind', order: 7 }];
+  const ps = [
+    { name: 'Read', area: 'Mind', cadence: 'daily' },
+    { name: 'Be still', area: 'Faith', cadence: 'daily' },
+    { name: 'Journal', area: 'Faith', cadence: 'daily' },
+    { name: 'Message someone', area: 'People', cadence: 'daily' },
+    { name: 'Work on the future', area: 'Future', cadence: '3/week' },
+  ];
+  const d = { areas: ar, practices: ps, log: new Map() };
+  const f = M.planDay(d, T, { focusCount: 3, weekStart: 1 });
+  assert.deepStrictEqual(f.focus.map(r => r.p.name), ['Be still', 'Message someone', 'Work on the future'], 'one per area in priority order; Mind\'s daily waits');
+  assert.ok(f.later.some(r => r.p.name === 'Read'));
+  /* Second helpings come only after every pressing area (Mind too) has one: 5 slots. */
+  assert.deepStrictEqual(M.planDay(d, T, { focusCount: 5, weekStart: 1 }).focus.map(r => r.p.name), ['Be still', 'Message someone', 'Work on the future', 'Read', 'Journal']);
+  /* A snoozed row is not eligible for an area's slot; the next one is. */
+  const sn = { ...d, log: new Map([[T, E([], [], ['Be still'])]]) };
+  assert.strictEqual(M.planDay(sn, T, { focusCount: 3, weekStart: 1 }).focus[0].p.name, 'Journal');
+  /* Not pressing (urgency < 1/3) never takes an area's first slot. */
+  const calm = { areas: ar, practices: [{ name: 'Hike', area: 'Faith', cadence: 'monthly' }, { name: 'Read', area: 'Mind', cadence: 'daily' }], log: new Map() };
+  assert.deepStrictEqual(M.planDay(calm, T, { focusCount: 1, weekStart: 1 }).focus.map(r => r.p.name), ['Read']);
+}
+
+/* ---- item 2: a skip is not a miss ---- */
+{
+  const T = '2026-09-11';
+  const stretch = { name: 'Stretch', cadence: 'daily', created: '2026-08-01' };
+  const lg = new Map([['2026-09-10', E([], ['Stretch'])]]);
+  assert.strictEqual(M.missedRun(stretch, lg, T), 0, 'yesterday skipped: no run');
+  /* skipped on the 9th, missed the 10th: the run is 1 day and the skip ends it */
+  const lg2 = new Map([['2026-09-09', E([], ['Stretch'])]]);
+  assert.strictEqual(M.missedRun(stretch, lg2, T), 1, 'the skip ends the run like a tick does');
+  const lg3 = new Map([['2026-09-08', E(['Stretch'])]]);
+  assert.strictEqual(M.missedRun(stretch, lg3, T), 2);
+  assert.strictEqual(M.reasonFor(stretch, M.progress(stretch, lg3, T, 1), lg3, T), 'Missed 2 days');
+  assert.strictEqual(M.reasonFor(stretch, M.progress(stretch, lg, T, 1), lg, T), 'Every day', 'only a skip yesterday: not "Missed"');
+  /* capped: never print a capped number as if it were exact */
+  const long = new Map();
+  const r = M.reasonFor(stretch, M.progress(stretch, long, T, 1), long, T);
+  assert.strictEqual(r, 'Missed 7+ days');
+  assert.strictEqual(M.missedRun(stretch, long, T), 7);
+  const lgExact = new Map([['2026-09-03', E(['Stretch'])]]);
+  assert.strictEqual(M.reasonFor(stretch, M.progress(stretch, lgExact, T, 1), lgExact, T), 'Missed 7+ days', 'seven or more reads as 7+');
+  const lg6 = new Map([['2026-09-04', E(['Stretch'])]]);
+  assert.strictEqual(M.reasonFor(stretch, M.progress(stretch, lg6, T, 1), lg6, T), 'Missed 6 days', 'below the cap the number is exact');
+}
+
+/* ---- item 5: the Week page review and the good-weeks streak judge a week identically ---- */
+{
+  const T = '2026-10-07'; // Wed
+  const lg = new Map();
+  for (let i = 1; i <= 23; i++) lg.set(D.addDays(T, -i), E(['Pray']));
+  lg.set(T, E(['Pray', 'Walk']));
+  const dd = { areas: [], practices: [{ name: 'Pray', cadence: 'daily' }, { name: 'Walk', cadence: 'daily' }], log: lg };
+  const lastWeek = D.addDays(D.weekStart(T, 1), -7);
+  const rev = M.weekReview(dd, lastWeek, 1, T);
+  assert.strictEqual(rev.asked, 7, 'Walk did not exist last week: only Pray is asked');
+  assert.strictEqual(rev.ratio, 1);
+  assert.deepStrictEqual(rev.rows.map(r => r.p.name), ['Pray']);
+  assert.strictEqual(M.weekStreak(dd, T, 1), 3, 'the streak counts that same week as good (Pray alone, three full weeks)');
+  /* every past week: review good  <=>  streak step good */
+  for (let w = 1; w <= 3; w++) {
+    const wk = D.addDays(D.weekStart(T, 1), -7 * w);
+    const r = M.weekReview(dd, wk, 1, T);
+    assert.ok(r.asked && r.ratio >= 0.6, `week -${w} judged good by the page too`);
+  }
+}
+
+/* ---- item 6: a practice's start is worked out once per call, not per week ---- */
+{
+  const T = '2026-10-07';
+  let passes = 0;
+  class CountingMap extends Map { [Symbol.iterator]() { passes++; return super[Symbol.iterator](); } }
+  const lg = new CountingMap();
+  const ps = Array.from({ length: 20 }, (_, i) => ({ name: 'P' + i, cadence: i % 3 ? 'daily' : '3/week', created: '2024-01-01' }));
+  for (let i = 0; i < 730; i++) lg.set(D.addDays(T, -i), E(ps.map(p => p.name)));
+  const dd = { areas: [], practices: ps, log: lg };
+  assert.strictEqual(M.weekStreak(dd, T, 1), 104);
+  assert.strictEqual(passes, 1, 'weekStreak: one pass over the whole log for 105 weeks x 20 practices');
+  passes = 0;
+  M.weekReview(dd, T, 1);
+  assert.strictEqual(passes, 1, 'weekReview: one pass');
+  /* the precomputed start equals the per-practice one */
+  const t0 = Date.now();
+  M.weekStreak(dd, T, 1);
+  assert.ok(Date.now() - t0 < 1500, 'sanity bound, not a benchmark');
+  const mixed = [{ name: 'A', cadence: 'daily', created: '2026-09-20' }, { name: 'B', cadence: 'daily' }, { name: 'C', cadence: 'daily', created: '2026-12-01' }, { name: 'D', cadence: 'daily' }];
+  const ml = new Map([['2026-09-25', E(['A', 'C'], ['B'])], ['2026-09-30', E([], [], ['B'], ['A'])], ['not-a-date', E(['D'])]]);
+  assert.strictEqual(M.practiceStart(mixed[0], ml), '2026-09-20', 'created earlier than the first tick');
+  assert.strictEqual(M.practiceStart(mixed[1], ml), '2026-09-25', 'a skip counts as appearing');
+  assert.strictEqual(M.practiceStart(mixed[2], ml), '2026-09-25', 'first appearance earlier than created');
+  assert.strictEqual(M.practiceStart(mixed[3], ml), '2026-09-25', 'legacy: no created, no appearance → the log\'s first real date (junk keys ignored)');
+  assert.strictEqual(M.practiceStart(mixed[3], new Map()), null, 'nothing at all → null (callers use today)');
+}
+
+/* ---- item 7: a never-done practice is "new" / "not yet", not "not in 90 days" ---- */
+{
+  const T = '2026-10-07';
+  const lg = new Map([[D.addDays(T, -1), E(['Other'])]]);
+  const fresh = { name: 'Stretch', cadence: 'daily', created: T };
+  const si = M.sinceInfo(fresh, lg, T);
+  assert.strictEqual(si.label, 'new');
+  assert.strictEqual(si.cold, false);
+  assert.strictEqual(M.reasonFor(fresh, M.progress(fresh, lg, T, 1), lg, T), 'Every day', 'Today and Areas agree: nothing is "missed" about it');
+  const unknown = { name: 'Stretch', cadence: 'daily' };
+  assert.deepStrictEqual([M.sinceInfo(unknown, lg, T).label, M.sinceInfo(unknown, new Map(), T).label], ['new', 'not yet'], 'legacy: the log began yesterday; empty log: start unknown');
+  const longLog = new Map([[D.addDays(T, -40), E(['Other'])]]);
+  assert.deepStrictEqual([M.sinceInfo(unknown, longLog, T).label, M.sinceInfo(unknown, longLog, T).cold], ['not yet', false]);
+  const ancient = new Map([[D.addDays(T, -200), E(['Other'])]]);
+  assert.deepStrictEqual([M.sinceInfo(unknown, ancient, T).label, M.sinceInfo(unknown, ancient, T).cold], ['not in 90 days', true], 'legacy and never ticked in 200 days of log');
+  const mid = { name: 'Stretch', cadence: 'daily', created: D.addDays(T, -40) };
+  assert.deepStrictEqual([M.sinceInfo(mid, lg, T).label, M.sinceInfo(mid, lg, T).cold], ['not yet', false]);
+  const old = { name: 'Stretch', cadence: 'daily', created: D.addDays(T, -200) };
+  assert.deepStrictEqual([M.sinceInfo(old, lg, T).label, M.sinceInfo(old, lg, T).cold], ['not in 90 days', true], 'older than the window: honest and cold');
+  assert.strictEqual(M.reasonFor(old, M.progress(old, lg, T, 1), lg, T), 'Missed 7+ days', '…and Today says the same thing');
+  const ticked = { name: 'Walk', cadence: 'daily', created: D.addDays(T, -200) };
+  const tl = new Map([[D.addDays(T, -20), E(['Walk'])]]);
+  assert.deepStrictEqual([M.sinceInfo(ticked, tl, T).label, M.sinceInfo(ticked, tl, T).cold], ['3 weeks ago', true]);
+}
+
+/* ---- item 8: a daily ignores plans for later days entirely ---- */
+{
+  const T = '2026-10-07';
+  const dd = { areas: [], practices: [{ name: 'Stretch', cadence: 'daily' }], log: new Map([[D.addDays(T, 1), E([], [], [], ['Stretch'])], [D.addDays(T, 3), E([], [], [], ['Stretch'])]]) };
+  const pl = M.planDay(dd, T, {});
+  assert.deepStrictEqual(pl.focus.map(r => r.p.name), ['Stretch']);
+  assert.strictEqual(pl.deferred.length, 0);
+  assert.strictEqual(M.progress(dd.practices[0], dd.log, T, 1).deferredTo, null);
+  assert.strictEqual(pl.focus[0].reason, 'Every day');
+}
+
+/* ---- legacy never-ticked practices count in reviews and the streak ----
+   Ruan's existing notes have no `created`. One never ticked has been asked
+   of him since the log began, so a past week's review must show it as asked
+   and slipped, and the good-weeks streak must feel it. A practice with
+   created=today was not part of those weeks. */
+{
+  const T = '2026-10-07';
+  const lg = new Map();
+  for (let i = 1; i <= 28; i++) lg.set(D.addDays(T, -i), E(['Pray']));
+  const wk = D.addDays(D.weekStart(T, 1), -7);
+  const mk2 = extra => ({ areas: [], practices: [{ name: 'Pray', cadence: 'daily' }, ...extra], log: lg });
+  const none = M.weekReview(mk2([]), wk, 1, T);
+  assert.strictEqual(none.asked, 7);
+  const legacy = mk2([{ name: 'Walk', cadence: 'daily' }]);
+  const r = M.weekReview(legacy, wk, 1, T);
+  assert.strictEqual(r.asked, 14, 'the legacy daily is asked');
+  assert.deepStrictEqual(r.slipped.map(x => x.p.name), ['Walk'], 'and slipped (0 of 7)');
+  assert.strictEqual(r.ratio, 0.5);
+  assert.strictEqual(M.weekStreak(mk2([]), T, 1), 3, 'weeks of 14, 21, 28 Sep (the log began mid-week of 7 Sep)');
+  assert.ok(M.weekStreak(legacy, T, 1) < M.weekStreak(mk2([]), T, 1), 'the streak drops accordingly (0.5 < 60%)');
+  assert.strictEqual(M.weekStreak(legacy, T, 1), 0);
+  const madeToday = mk2([{ name: 'Walk', cadence: 'daily', created: T }]);
+  assert.strictEqual(M.weekReview(madeToday, wk, 1, T).asked, 7, 'created=today: not part of last week');
+  assert.strictEqual(M.weekStreak(madeToday, T, 1), 3);
+  assert.strictEqual(M.weekReview(mk2([{ name: 'Walk', cadence: 'daily' }]), D.addDays(wk, -56), 1, T).asked, 0, 'no log existed that week: nothing to judge');
 }
 
 /* dates */

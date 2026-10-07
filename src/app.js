@@ -14,6 +14,7 @@ const { renderWeek } = require('./page-week');
 const { renderMonth } = require('./page-month');
 const { renderAreas } = require('./page-areas');
 const { renderPlan } = require('./page-plan');
+const { undoMove } = require('./day-menu');
 const { openAddModal, openEditModal, openNextStepModal, openNoteModal } = require('./modals');
 const { refreshCalendars, calendarEvents, isStale, urls } = require('./calendar');
 const { applyAccent } = require('./accents');
@@ -132,12 +133,16 @@ function mountApp(view) {
       try { await plugin.saveSettings(); } catch (e) { console.error('rhythm view', e); }
       render();
     },
-    /* Promise a practice to a day, or take the promise back. */
+    /* Promise a practice to a day, or take the promise back. Undo puts both
+       days' flags back exactly as they were (store.restoreFlags). */
     async movePlan(name, from, to) {
       try {
-        await store.movePlan(name, from, to);
+        const res = await store.movePlan(name, from, to);
         await ctx.reload();
-        ctx.toast(to ? `${name} → ${D.fmtShort(to)}` : `${name} back to waiting`, 'Undo', () => ctx.movePlan(name, to, from));
+        ctx.toast(to ? `${name} → ${D.fmtShort(to)}` : `${name} back to waiting`, 'Undo', async () => {
+          try { await undoMove(store, name, from, to, res); await ctx.reload(); }
+          catch (e) { fail('plan', e, 'could not undo that.'); }
+        });
       } catch (e) { fail('plan', e, 'could not move that.'); }
     },
     toggleLater() { state.showLater = !state.showLater; render(); },

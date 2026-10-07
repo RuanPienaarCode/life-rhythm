@@ -73,6 +73,7 @@ class ItemModal extends Modal {
 
     if (!editing) {
       const q = input(c, 'rv-input rv-quick', { type: 'text', placeholder: 'Type it fast: Practice guitar daily 20min @evening #Craft', value: this.quick, autocomplete: 'off' });
+      q.setAttribute('aria-label', 'Add something: type it in one line');
       q.addEventListener('input', () => {
         this.quick = q.value;
         const p = parseQuickAdd(q.value, areas);

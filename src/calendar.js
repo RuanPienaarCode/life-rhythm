@@ -78,4 +78,32 @@ function calendarEvents(plugin) {
   }));
 }
 
-module.exports = { refreshCalendars, calendarEvents, isStale, urls };
+/* "5 min ago" / "3 h ago" / "3 d ago". */
+function agoText(ms, now) {
+  const mins = Math.round(Math.max(0, now - ms) / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins} min ago`;
+  const hours = Math.round(mins / 60);
+  return hours < 48 ? `${hours} h ago` : `${Math.round(hours / 24)} d ago`;
+}
+
+/* The one-line calendar status shown in settings, from the cache that
+   refreshCalendars keeps (fetchedAt = last full or partial success,
+   lastAttemptAt = last try of any outcome, errors = the last try's failures).
+   A failed attempt is always said so — even before anything ever loaded. */
+function calendarStatusLine(cache, now) {
+  const c = cache || {};
+  const t = now == null ? Date.now() : now;
+  const failed = Array.isArray(c.errors) ? c.errors.length : 0;
+  const tried = c.lastAttemptAt ? `last tried ${agoText(c.lastAttemptAt, t)}` : '';
+  if (!c.fetchedAt) {
+    if (!failed) return 'Not fetched yet.';
+    return `Couldn't load: ${failed} link(s)${tried ? ` — ${tried}` : ''}.`;
+  }
+  const n = Array.isArray(c.events) ? c.events.length : 0;
+  const base = `${n} event${n === 1 ? '' : 's'} cached, fetched ${agoText(c.fetchedAt, t)}`;
+  if (!failed) return `${base}.`;
+  return `${base} · couldn't load ${failed} link(s)${tried ? `, ${tried}` : ''}.`;
+}
+
+module.exports = { refreshCalendars, calendarEvents, isStale, urls, calendarStatusLine };

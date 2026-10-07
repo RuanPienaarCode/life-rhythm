@@ -21,19 +21,68 @@ function unescape(s) {
   return String(s || '').replace(/\\n/gi, '\n').replace(/\\,/g, ',').replace(/\\;/g, ';').replace(/\\\\/g, '\\');
 }
 
+/* One Intl formatter per zone: building one is the expensive part (a
+   2000-event TZID feed used to build thousands). A failed zone is cached
+   too, so an unknown TZID costs one failed construction, not one per stamp. */
+const dtfCache = new Map();
+function formatterFor(tz) {
+  let f = dtfCache.get(tz);
+  if (f === undefined) {
+    if (dtfCache.size > 200) dtfCache.clear(); /* a hostile feed cannot grow this without bound */
+    try {
+      f = new Intl.DateTimeFormat('en-US', {
+        timeZone: tz, hourCycle: 'h23',
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
+      });
+    } catch (e) {
+      f = null;
+    }
+    dtfCache.set(tz, f);
+  }
+  if (!f) throw new RangeError(`Unknown time zone: ${tz}`);
+  return f;
+}
+
+/* Uncached: offset (ms) to add to a UTC instant to get its wall-clock time in
+   `tz`. Throws on an unknown zone. */
+function rawOffsetMs(ms, tz) {
+  const parts = {};
+  for (const p of formatterFor(tz).formatToParts(new Date(ms))) parts[p.type] = p.value;
+  const hour = parts.hour === '24' ? 0 : +parts.hour;
+  const asUTC = Date.UTC(+parts.year, +parts.month - 1, +parts.day, hour, +parts.minute, +parts.second);
+  return asUTC - ms;
+}
+
+/* Offsets are memoised at UTC midnights. If a zone has the same offset at
+   both ends of a UTC day (no transition inside it) that offset holds for
+   every instant in the day; on the rare day it changes we ask exactly. */
+const DAY_MS = 86400000;
+const offsetCache = new Map(); /* tz → Map(UTC day number → offset) */
+function offsetAtMidnight(tz, day) {
+  let byDay = offsetCache.get(tz);
+  if (!byDay) {
+    if (offsetCache.size > 200) offsetCache.clear();
+    byDay = new Map();
+    offsetCache.set(tz, byDay);
+  }
+  let v = byDay.get(day);
+  if (v === undefined) {
+    if (byDay.size > 50000) byDay.clear();
+    v = rawOffsetMs(day * DAY_MS, tz);
+    byDay.set(day, v);
+  }
+  return v;
+}
+
 /* Offset (ms) to add to a UTC instant to get that instant's wall-clock time
    in `tz`. Throws on an unknown zone. */
 function tzOffsetMs(date, tz) {
-  const dtf = new Intl.DateTimeFormat('en-US', {
-    timeZone: tz, hourCycle: 'h23',
-    year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', second: '2-digit',
-  });
-  const parts = {};
-  for (const p of dtf.formatToParts(date)) parts[p.type] = p.value;
-  const hour = parts.hour === '24' ? 0 : +parts.hour;
-  const asUTC = Date.UTC(+parts.year, +parts.month - 1, +parts.day, hour, +parts.minute, +parts.second);
-  return asUTC - date.getTime();
+  const ms = date.getTime();
+  const day = Math.floor(ms / DAY_MS);
+  const a = offsetAtMidnight(tz, day);
+  if (a === offsetAtMidnight(tz, day + 1)) return a;
+  return rawOffsetMs(ms, tz);
 }
 
 /* Wall-clock date/time components in `tz` → the UTC instant (ms) they name. */
@@ -46,30 +95,65 @@ function zonedToUTC(y, mo, d, h, mi, s, tz) {
   return utc;
 }
 
+const hhmm = d => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+const utcISO = d => `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+const utcHHMM = d => `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
+const STAMP_RE = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})?(Z)?$/;
+
 /* '20260912' → {date}, '20260912T190000' → local, '...Z' → UTC → local,
    TZID=Zone → converted to the device's local time (unknown zone: treated
-   as floating local time, same as no TZID at all). */
+   as floating local time, same as no TZID at all).
+   `date`/`time` are always the DEVICE-local result. A zoned stamp also
+   carries `tz` ('UTC' or the TZID) and `ownDate`/`ownTime`, the wall clock
+   in that zone — recurrence is expanded there (see `localOf`). Floating and
+   all-day stamps have no `tz`; their own and local values are the same. */
 function parseStamp(val, params) {
   const s = String(val || '').trim();
   let m = /^(\d{4})(\d{2})(\d{2})$/.exec(s);
-  if (m) return { date: `${m[1]}-${m[2]}-${m[3]}`, time: '', allDay: true };
-  m = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})?(Z)?$/.exec(s);
+  if (m) {
+    const date = `${m[1]}-${m[2]}-${m[3]}`;
+    return { date, time: '', allDay: true, tz: null, ownDate: date, ownTime: '' };
+  }
+  m = STAMP_RE.exec(s);
   if (!m) return null;
   if (m[7]) {
     const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0)));
-    return { date: D.toISO(d), time: `${pad(d.getHours())}:${pad(d.getMinutes())}`, allDay: false };
+    return { date: D.toISO(d), time: hhmm(d), allDay: false, tz: 'UTC', ownDate: utcISO(d), ownTime: utcHHMM(d) };
   }
   const tzid = params && params.TZID;
   if (tzid) {
     try {
       const utc = zonedToUTC(+m[1], +m[2], +m[3], +m[4], +m[5], +(m[6] || 0), tzid);
       const d = new Date(utc);
-      return { date: D.toISO(d), time: `${pad(d.getHours())}:${pad(d.getMinutes())}`, allDay: false, tzid };
+      const own = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0)));
+      return { date: D.toISO(d), time: hhmm(d), allDay: false, tzid, tz: tzid, ownDate: utcISO(own), ownTime: utcHHMM(own) };
     } catch (e) {
       /* Unknown TZID: fall through to floating local time. */
     }
   }
-  return { date: `${m[1]}-${m[2]}-${m[3]}`, time: `${m[4]}:${m[5]}`, allDay: false, tzid };
+  const date = `${m[1]}-${m[2]}-${m[3]}`, time = `${m[4]}:${m[5]}`;
+  return { date, time, allDay: false, tzid, tz: null, ownDate: date, ownTime: time };
+}
+
+/* The UTC instant (ms) of a zoned occurrence, or the device-local instant of a
+   floating one. `ownDate` is an ISO date in the event's own zone. */
+function instantOf(start, ownDate) {
+  const y = +ownDate.slice(0, 4), mo = +ownDate.slice(5, 7), d = +ownDate.slice(8, 10);
+  const h = start.ownTime ? +start.ownTime.slice(0, 2) : 0, mi = start.ownTime ? +start.ownTime.slice(3, 5) : 0;
+  if (!start.tz) return new Date(y, mo - 1, d, h, mi, 0).getTime();
+  if (start.tz === 'UTC') return Date.UTC(y, mo - 1, d, h, mi, 0);
+  return zonedToUTC(y, mo, d, h, mi, 0, start.tz);
+}
+
+/* One occurrence of a series (given as the date in the event's own zone) →
+   the device-local {date, time} it falls on. Each occurrence is converted on
+   its own, so a DST change in the event's zone moves the local time and a
+   zone far from the device's can push the date either way. */
+function localOf(start, ownDate) {
+  if (start.allDay) return { date: ownDate, time: '' };
+  if (!start.tz) return { date: ownDate, time: start.ownTime };
+  const d = new Date(instantOf(start, ownDate));
+  return { date: D.toISO(d), time: hhmm(d) };
 }
 
 function parseProps(block) {
@@ -118,6 +202,37 @@ function parseIntList(s) {
 const KNOWN_PARTS = new Set(['FREQ', 'INTERVAL', 'COUNT', 'UNTIL', 'BYDAY', 'BYMONTHDAY', 'BYMONTH', 'BYSETPOS', 'WKST']);
 const KNOWN_FREQ = new Set(['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY']);
 
+/* UNTIL keeps what it was written as, because each form means something
+   different: a date (inclusive of that day in the event's own zone), a UTC
+   instant (`Z`), or a floating wall-clock time. null if unreadable. */
+function parseUntil(val) {
+  const s = String(val || '').trim();
+  let m = /^(\d{4})(\d{2})(\d{2})$/.exec(s);
+  if (m) return { kind: 'date', date: `${m[1]}-${m[2]}-${m[3]}` };
+  m = STAMP_RE.exec(s);
+  if (!m) return null;
+  if (m[7]) return { kind: 'utc', ms: Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0)) };
+  return { kind: 'floating', date: `${m[1]}-${m[2]}-${m[3]}`, time: `${m[4]}:${m[5]}` };
+}
+
+/* Is this occurrence (own-zone date) after the series' UNTIL? */
+function pastUntil(ev, ownDate) {
+  const u = ev.rrule.until;
+  if (!u) return false;
+  const st = ev.start;
+  if (u.kind === 'date') return ownDate > u.date;
+  if (st.allDay) return u.kind === 'utc' ? ownDate > utcISO(new Date(u.ms)) : ownDate > u.date;
+  if (u.kind === 'floating') return `${ownDate} ${st.ownTime}` > `${u.date} ${u.time}`;
+  return instantOf(st, ownDate) > u.ms;
+}
+
+/* The latest own-zone date UNTIL could still admit — only a loop bound; the
+   exact test is `pastUntil`. A UTC instant is at most a day off any zone. */
+function untilBound(u) {
+  if (!u) return null;
+  return u.kind === 'utc' ? D.addDays(utcISO(new Date(u.ms)), 1) : u.date;
+}
+
 function parseRRule(val) {
   const r = {};
   let unsupported = false;
@@ -135,7 +250,7 @@ function parseRRule(val) {
     freq,
     interval: Math.max(1, parseInt(r.INTERVAL || '1', 10)),
     count: r.COUNT ? parseInt(r.COUNT, 10) : null,
-    until: r.UNTIL ? (parseStamp(r.UNTIL) || {}).date || null : null,
+    until: r.UNTIL ? parseUntil(r.UNTIL) : null,
     byday: parseByDayList(r.BYDAY),
     bymonthday: parseIntList(r.BYMONTHDAY),
     bymonth: parseIntList(r.BYMONTH),
@@ -187,19 +302,25 @@ function applySetPos(dates, positions) {
   return [...new Set(picked)].sort();
 }
 
-/* Expand one event's dates inside [from, to]. Multi-day all-day spans are
-   NOT handled here (see `expandSpan`) — this only anchors each occurrence
-   on its start date. */
+/* Expand one event's dates inside [from, to]. Dates here are in the event's
+   OWN zone (convert with `localOf`); an EXDATE is matched on the local date,
+   as it was parsed. Multi-day all-day spans are NOT handled here (see
+   `expandSpan`) — this only anchors each occurrence on its start date. */
 function occurrences(ev, from, to) {
-  const start = ev.start.date;
+  const start = ev.start.ownDate;
   if (!ev.rrule || ev.rrule.unsupported) {
     return start >= from && start <= to ? [start] : [];
   }
   const r = ev.rrule;
   const out = [];
-  const limitTo = r.until && r.until < to ? r.until : to;
+  const bound = untilBound(r.until);
+  const limitTo = bound && bound < to ? bound : to;
   let n = 0;
-  const push = d => { if (d >= from && d <= limitTo && !ev.exdates.has(d)) out.push(d); };
+  const push = d => {
+    if (d < from || d > limitTo || pastUntil(ev, d)) return;
+    if (ev.exdates.size && ev.exdates.has(localOf(ev.start, d).date)) return;
+    out.push(d);
+  };
   if (r.freq === 'DAILY') {
     let d = start;
     /* No COUNT: a series that began years ago need not be stepped one day
@@ -336,8 +457,15 @@ function parseICS(text, from, to) {
 
   const events = [];
   const add = ev => {
-    for (const date of expandSpan(ev, from, to)) {
-      events.push({ uid: ev.uid, name: ev.name, date, time: ev.start.allDay ? '' : ev.start.time, allDay: ev.start.allDay, location: ev.location, description: ev.description });
+    /* A zoned series is expanded in its own zone, so the window is widened
+       by two days (zones differ by up to 26 h) and each occurrence is
+       clipped again once it is in local time. */
+    const wide = ev.start.tz ? 2 : 0;
+    const lo = wide ? D.addDays(from, -wide) : from, hi = wide ? D.addDays(to, wide) : to;
+    for (const own of expandSpan(ev, lo, hi)) {
+      const { date, time } = localOf(ev.start, own);
+      if (date < from || date > to) continue;
+      events.push({ uid: ev.uid, name: ev.name, date, time, allDay: ev.start.allDay, location: ev.location, description: ev.description });
     }
   };
   for (const ev of raw) {
