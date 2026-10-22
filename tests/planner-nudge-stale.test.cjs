@@ -28,7 +28,7 @@ Module._load = origLoad;
   assert.deepStrictEqual(calls, [[raw, '2026-10-08']]);
 
   /* 2. the board words it plainly, and says nothing was ticked */
-  assert.strictEqual(why('stale'), 'that reminder changed in Nudge since this board read it, so nothing was ticked — the board has been refreshed');
+  assert.strictEqual(why('stale'), 'that reminder changed since this board read it, so nothing was ticked — the board has been refreshed');
   assert.notStrictEqual(why('stale'), why('no-such-reason'));
 
   /* 3. a bare { ok: false } from Nudge (its malformed-input answer) still

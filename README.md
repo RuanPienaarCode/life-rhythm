@@ -1,12 +1,14 @@
 # Rhythm
 
-A quiet dashboard for life priorities, practices, goals and events, kept as plain notes in your Obsidian vault. Daily, weekly and monthly rhythms. Works offline, on desktop and mobile. Styled after Apple's own apps: a large title, inset grouped lists, one blue.
+A quiet dashboard for life priorities, practices, goals, events, reminders and a two-week plan, kept as plain notes in your Obsidian vault. Daily, weekly and monthly rhythms. Works offline, on desktop and mobile. Styled after Apple's own apps: a large title, inset grouped lists, one blue.
 
 The one rule: **the list you look at is short and varied.** Today shows a few things (three by default). Every life area gets a turn before any area gets a second slot, so a day reads Faith, Family, Body rather than three Faith rows. Everything else that is due folds away under "When there's space".
 
 ## Pages
 
 - **Today** — a large number, the few practices to do grouped by time of day (morning, during the day, evening, before bed), each with a plain reason it is there ("2 more this week · 3 days left", "Missed 3 days"), a fold for the rest, what you've done, what you said no to, events in the next seven days, one goal's next step, and the first line of today's note. When the list is clear, a line of scripture or a stillness prompt. Arrows step back and forward a day.
+- **Reminders** — the things you must not forget, as plain checkbox lines in one note (default `Reminders.md`): due dates, times, priorities, repeats, lists, a quick-add line that reads "dentist tomorrow 9am !high every 6 months", notices in Obsidian when one comes due, a count on the ribbon icon, and a calendar file (`.ics`) your phone can subscribe to so it alerts you. This page was the Nudge plugin.
+- **Fortnight** — a board for the next two weeks over every Tasks line in the vault (⏳ puts a to-do on a day, 🛫 on next week, `#later` in Later), your reminders and your practices. Drag cards between days, review today in the evening, and the first open of the day greets you with "Plan the week" or "Plan today". This page was the Fortnight plugin.
 - **Week** — two-line rows per practice with seven dots you can tap, grouped by area. On the last day of the week, or on any past week, a "Week in review" card: what got done against what was asked, what slipped, and one question whose answer is saved into that day's note.
 - **Month** — every practice against its monthly target, all goals (a goal without a next step is flagged), the month's events.
 - **Plan** — a board. A shelf of the practices still looking for a day, and seven day columns to drop them on. Drag a card by its grip, or tap it for a "Move to…" menu. A practice you have placed stays quiet on every other day, so a week of four runs becomes four calm days instead of seven noisy ones. Only weekly and monthly practices reach the board; a daily one has no *when* to decide, so it sits under each column as a quiet count.
@@ -23,6 +25,19 @@ The **+** button adds a practice, goal, event or area. Its first field is a quic
 **Keyboard (desktop):** `1`–`7` tick the focus rows, `←` `→` move the date, `T` returns to today, `N` adds.
 
 **On a phone** the tabs sit at the bottom, in thumb reach.
+
+## Coming from Nudge or Fortnight
+
+Rhythm 0.2.0 took both plugins in. Your notes stay where they are — the reminders note, your Tasks lines, the planner note — and are read and written exactly as before; the reminders calendar file keeps its path and its event IDs, so a phone subscribed to it carries on without duplicates.
+
+- **Settings** are copied across once, the first time Rhythm 0.2.0 loads, from each old plugin's `data.json` (which is only read, never changed). Rhythm's week start and look win; the greeting name comes from Nudge, else Fortnight.
+- **Turn Nudge and Fortnight off** when you turn Rhythm 0.2.0 on, or you will get two sets of reminder notices.
+- **Links** like `obsidian://nudge-reminders?add=1` keep working. `obsidian://rhythm?tab=reminders` and `?tab=fortnight` are the new ones.
+- **Hotkeys** bound to Nudge or Fortnight commands need binding again to the Rhythm commands of the same name (Obsidian keys a hotkey to the plugin that registered the command).
+
+## For other plugins
+
+Rhythm exposes a small versioned API at `app.plugins.plugins.rhythm.api` (`apiVersion: 1`): a reminders summary with tick and snooze, today's practices with tick, events between two dates, the week start, and `onChange(cb)` to hear about changes. Every row carries an opaque `ref`; writes take it back and refuse (`{ ok: false, reason: 'changed' }`) when the line has changed since it was read. See `src/api.js` for the full contract. Vista uses it.
 
 ## The notes
 

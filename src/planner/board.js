@@ -30,15 +30,15 @@ const REASON = {
   changed: 'it changed in its note — the board has been refreshed',
   /* Nudge's toggle found the line only by its date-tolerant fallback on a 🔁
      reminder: it rolled on (or was edited) since this board read it. */
-  stale: 'that reminder changed in Nudge since this board read it, so nothing was ticked — the board has been refreshed',
+  stale: 'that reminder changed since this board read it, so nothing was ticked — the board has been refreshed',
   locked: 'events are fixed',
-  repeat: "Nudge couldn't work out its next date",
+  repeat: "its repeat's next date couldn't be worked out",
   'done-today': "it's already done today — that promise is kept for its day",
   'done-that-day': "that practice is already done on that day",
   missing: 'its note no longer exists',
-  'no-nudge': "Nudge isn't available",
+  'no-nudge': "reminders aren't available",
   'no-rhythm': "Rhythm isn't available",
-  'nudge-no-due': "this reminder has no 📅 date, and Nudge can only change a reminder's 📅 — set its date in Nudge first",
+  'nudge-no-due': "this reminder has no 📅 date, and 📅 is the one date the board can change on a reminder — set its date on the Reminders page first",
   'needs-day': 'reminders and practices need a day — drop it on one',
   'not-droppable': 'only to-dos can be dropped',
   'not-done': "Tasks didn't mark it done, so nothing was changed",
@@ -218,7 +218,7 @@ function mountBoard(view) {
     try { r = await plugin.store.move(card, date); }
     catch (e) { console.error('Fortnight: move failed', e); r = { ok: false, reason: 'error' }; }
     if (!r.ok && r.reason !== 'busy') {
-      new Notice(`Fortnight: couldn't move "${card.text}": ${why(r.reason)}.`);
+      new Notice(`Rhythm: couldn't move "${card.text}": ${why(r.reason)}.`);
     }
     await refresh(true);
   }
@@ -229,11 +229,11 @@ function mountBoard(view) {
     try { r = await plugin.store.tick(card, D.todayISO()); }
     catch (e) { console.error('Fortnight: tick failed', e); r = { ok: false, reason: 'error' }; }
     if (!r.ok && r.reason !== 'busy') {
-      new Notice(`Fortnight: couldn't tick "${card.text}": ${why(r.reason)}.`);
+      new Notice(`Rhythm: couldn't tick "${card.text}": ${why(r.reason)}.`);
     }
     if (r.plain && !plugin._toldPlainTick) {
       plugin._toldPlainTick = true;
-      new Notice('Fortnight: ticked as a plain [x]. Install the Tasks plugin to get ✅ dates and repeating to-dos.', 8000);
+      new Notice('Rhythm: ticked as a plain [x]. Install the Tasks plugin to get ✅ dates and repeating to-dos.', 8000);
     }
     await refresh(true);
   }
@@ -252,7 +252,7 @@ function mountBoard(view) {
       const reason = r.reason === 'due-sooner' && r.due
         ? `it's due ${dayLabel(r.due)} — put it on a day before then instead`
         : r.reason === 'repeats' ? REASON_LATER_REPEATS : why(r.reason);
-      new Notice(`Fortnight: couldn't move "${card.text}" to ${dest.label}: ${reason}.`);
+      new Notice(`Rhythm: couldn't move "${card.text}" to ${dest.label}: ${reason}.`);
     }
     /* Tagged in its own note: say where, and offer to take it back. */
     if (r.ok && r.tagged) {
@@ -260,7 +260,7 @@ function mountBoard(view) {
       undoNotice(`"${card.text}" is in Later — tagged ${tag} in ${card.path.replace(/\.md$/, '')}. `, async notice => {
         const back = await plugin.store.revert(card, r.after, r.before);
         if (notice && notice.hide) notice.hide();
-        if (!back.ok) new Notice(`Fortnight: couldn't undo — the line changed in ${card.path}.`);
+        if (!back.ok) new Notice(`Rhythm: couldn't undo — the line changed in ${card.path}.`);
         await refresh(true);
       });
     }
@@ -275,12 +275,12 @@ function mountBoard(view) {
     try { r = await plugin.store.drop(card); }
     catch (e) { console.error('Fortnight: drop failed', e); r = { ok: false, reason: 'error' }; }
     if (!r.ok) {
-      if (r.reason !== 'busy') new Notice(`Fortnight: couldn't drop "${card.text}": ${why(r.reason)}.`);
+      if (r.reason !== 'busy') new Notice(`Rhythm: couldn't drop "${card.text}": ${why(r.reason)}.`);
     } else {
       undoNotice(`Dropped "${card.text}". `, async notice => {
         const back = await plugin.store.revert(card, r.after, r.before);
         if (notice && notice.hide) notice.hide();
-        if (!back.ok) new Notice(`Fortnight: couldn't undo — the line changed in ${card.path}.`);
+        if (!back.ok) new Notice(`Rhythm: couldn't undo — the line changed in ${card.path}.`);
         await refresh(true);
       });
     }
@@ -395,9 +395,9 @@ function mountBoard(view) {
       if (card.source === 'practice') setIcon(from.createSpan({ cls: 'fn-ic' }), 'repeat');
       from.createSpan({ text: card.area || 'Rhythm' });
     } else if (card.source === 'nudge') {
-      const from = meta.createSpan({ cls: 'fn-from fn-nudge', attr: { 'aria-label': 'Nudge reminder' } });
+      const from = meta.createSpan({ cls: 'fn-from fn-nudge', attr: { 'aria-label': 'Reminder' } });
       setIcon(from.createSpan({ cls: 'fn-ic' }), 'bell');
-      from.createSpan({ text: 'Nudge' });
+      from.createSpan({ text: 'Reminder' });
     } else {
       /* Tagged into Later from elsewhere: the folder too, so you know
          which project it came from. */
@@ -770,7 +770,7 @@ function mountBoard(view) {
       bar.createDiv({ cls: 'fn-rv-fill' }).style.width = `${(step / cards.length) * 100}%`;
       const titleId = `fn-rv-title-${++uid}`;
       inner.createDiv({ cls: 'fn-sh-title', text: card.text || '(untitled)', attr: { id: titleId } });
-      inner.createDiv({ cls: 'fn-sh-meta', text: `${card.date && card.date < board.today ? `Slipped from ${short(card.date)}` : 'Today'} · ${card.source === 'nudge' ? 'Nudge' : noteName(card.path)}` });
+      inner.createDiv({ cls: 'fn-sh-meta', text: `${card.date && card.date < board.today ? `Slipped from ${short(card.date)}` : 'Today'} · ${card.source === 'nudge' ? 'Reminders' : noteName(card.path)}` });
       const can = actionsFor(card, board);
       /* The choices belong to the card named above them: a screen reader
          hears "Done" as an answer about THIS to-do. */
@@ -892,8 +892,8 @@ function mountBoard(view) {
     catch (e) { console.error('Fortnight: review write failed', e); w = { ok: false }; }
     closeReview();
     const stayed = failed.length ? ` ${failed.length} couldn't be changed and stay open (they were edited meanwhile, or no longer match): ${failed.join(', ')}.` : '';
-    if (w.ok) new Notice(`Fortnight: review added to ${w.path}.${stayed}`, 10000);
-    else new Notice(`Fortnight: couldn't write the review (see the console). Your other choices were applied.${stayed}`, 10000);
+    if (w.ok) new Notice(`Rhythm: review added to ${w.path}.${stayed}`, 10000);
+    else new Notice(`Rhythm: couldn't write the review (see the console). Your other choices were applied.${stayed}`, 10000);
     await refresh(true);
   }
 
@@ -930,7 +930,7 @@ function mountBoard(view) {
       writing.delete(dest.key);
       input.removeAttribute('aria-busy');
       if (!r.ok) {
-        new Notice(`Fortnight: couldn't add that to-do (${r.reason === 'error' ? 'see the console' : r.reason}).`);
+        new Notice(`Rhythm: couldn't add that to-do (${r.reason === 'error' ? 'see the console' : r.reason}).`);
         return;
       }
       /* Only what was sent is cleared; anything typed since stays. */
@@ -1052,7 +1052,7 @@ function mountBoard(view) {
     title.createDiv({ cls: 'fn-range', text: `${short(board.weekStart)} – ${short(D.addDays(board.weekStart, 6))}` });
     /* Installed but unreadable: say so quietly, once, above the board. */
     if (plugin.store.problems().includes('nudge')) {
-      top.createSpan({ cls: 'fn-problem', text: 'Nudge reminders could not be read — they are missing from this board.' });
+      top.createSpan({ cls: 'fn-problem', text: 'Reminders could not be read — they are missing from this board.' });
     }
     const rb = top.createEl('button', { cls: 'fn-reviewbtn', attr: { type: 'button' }, text: 'Review today' });
     fk(rb, 'review');

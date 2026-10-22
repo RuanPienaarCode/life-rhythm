@@ -92,17 +92,17 @@ assert.ok(!H.boardHasRaw({ days: [] }, '- [ ] x'), 'a nearly empty board does no
 /* ---- what to tell the user ----------------------------------------------- */
 assert.strictEqual(
   H.addedNotice('- [ ] Pay the deposit 📅 2026-12-01', withCards, 'Planning/Fortnight.md'),
-  'Fortnight: added "Pay the deposit" to Planning/Fortnight.md, but it isn\'t on the board yet — its date (Tue 1 Dec) is beyond next week. It will show once that day is within the two weeks.',
+  'Rhythm: added "Pay the deposit" to Planning/Fortnight.md, but it isn\'t on the board yet — its date (Tue 1 Dec) is beyond next week. It will show once that day is within the two weeks.',
 );
 assert.strictEqual(
   H.addedNotice('- [ ] Water the plants', withCards, 'Templates/Fortnight.md'),
-  'Fortnight: added "Water the plants" to Templates/Fortnight.md, but it isn\'t on the board. If that note is inside an excluded folder (Fortnight\'s settings), its to-dos never show.',
+  'Rhythm: added "Water the plants" to Templates/Fortnight.md, but it isn\'t on the board. If that note is inside an excluded folder (Rhythm\'s settings, under Fortnight), its to-dos never show.',
 );
 
 /* A date that doesn't exist (a line can say ⏳ 2026-09-31) gets no invented weekday. */
 assert.strictEqual(
   H.addedNotice('- [ ] Odd one ⏳ 2026-09-31', withCards, 'Planning/Fortnight.md'),
-  'Fortnight: added "Odd one" to Planning/Fortnight.md, but it isn\'t on the board. If that note is inside an excluded folder (Fortnight\'s settings), its to-dos never show.',
+  'Rhythm: added "Odd one" to Planning/Fortnight.md, but it isn\'t on the board. If that note is inside an excluded folder (Rhythm\'s settings, under Fortnight), its to-dos never show.',
 );
 
 console.log('board helpers OK');

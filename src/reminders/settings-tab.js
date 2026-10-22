@@ -96,7 +96,7 @@ class NudgeSettingTab extends PluginSettingTab {
       .setName('Export now')
       .addButton(b => b.setButtonText('Write the file').setCta().onClick(async () => {
         const r = await this.plugin.exportICS();
-        new Notice(`Nudge: ${r.count} reminder${r.count === 1 ? '' : 's'} written to ${r.path}.`);
+        new Notice(`Rhythm: ${r.count} reminder${r.count === 1 ? '' : 's'} written to ${r.path}.`);
       }));
 
     /* Inside Rhythm the view wears Rhythm's look, and the name and

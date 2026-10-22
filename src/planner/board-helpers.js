@@ -156,11 +156,11 @@ function addedNotice(raw, board, path) {
   const date = t ? (t.scheduled || t.due) : '';
   const real = D.isDate(date);
   const lastDay = board && board.nextWeek ? D.addDays(board.nextWeek.start, 6) : '';
-  const head = `Fortnight: added "${name}" to ${path}, but it isn't on the board`;
+  const head = `Rhythm: added "${name}" to ${path}, but it isn't on the board`;
   if (real && lastDay && date > lastDay) {
     return `${head} yet — its date (${D.DOW[D.weekday(date)]} ${D.short(date)}) is beyond next week. It will show once that day is within the two weeks.`;
   }
-  return `${head}. If that note is inside an excluded folder (Fortnight's settings), its to-dos never show.`;
+  return `${head}. If that note is inside an excluded folder (Rhythm's settings, under Fortnight), its to-dos never show.`;
 }
 
 module.exports = { parseColor, hslToRgb, rgbToHsl, contrast, clampAccent, tidyPath, folderLines, signature, allCards, boardHasRaw, addedNotice };

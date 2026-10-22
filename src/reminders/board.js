@@ -478,7 +478,7 @@ function mountBoard(view) {
      just vanish. */
   function gone(r, what) {
     if (!r || r.ok !== false) return false;
-    new Notice(`Nudge: that reminder has moved or gone from the note (or could not be read), so ${what}.`);
+    new Notice(`Rhythm: that reminder has moved or gone from the note (or could not be read), so ${what}.`);
     return true;
   }
 
@@ -486,7 +486,7 @@ function mountBoard(view) {
     const raw = nodes.addInput.value.trim();
     if (!raw) return;
     const q = parseQuick(raw, state.today);
-    if (!q.title) { new Notice('Nudge: give the reminder something to say.'); return; }
+    if (!q.title) { new Notice('Rhythm: give the reminder something to say.'); return; }
     /* Emptied BEFORE the write: a second Enter or click while it is in flight
        finds nothing to add instead of adding the same reminder again. */
     const typed = nodes.addInput.value;
@@ -505,7 +505,7 @@ function mountBoard(view) {
     if (r && r.ok === false) {
       /* Give the text back, unless the user has already started another. */
       if (!nodes.addInput.value) { nodes.addInput.value = typed; renderHint(); }
-      new Notice('Nudge: that reminder could not be added — nothing was written.');
+      new Notice('Rhythm: that reminder could not be added — nothing was written.');
       return;
     }
     await reload();
@@ -518,7 +518,7 @@ function mountBoard(view) {
       row.setAttribute('aria-busy', 'true');
       const r = await store.toggle(it, D.todayISO());
       if (!r.ok) { new Notice(tickRefused(r)); await reload(); return; }
-      if (r.rolled) new Notice(`Nudge: next one ${D.relative(r.rolled.due, state.today).toLowerCase()}.`);
+      if (r.rolled) new Notice(`Rhythm: next one ${D.relative(r.rolled.due, state.today).toLowerCase()}.`);
       await reload();
       await maybeExport();
     });
@@ -527,11 +527,11 @@ function mountBoard(view) {
   /* Why a tick didn't happen. A repeat we can't read is left open on
      purpose — ticking it would end the series without a word. */
   function tickRefused(r) {
-    if (r && r.reason === 'repeat') return `Nudge: can't work out when "🔁 ${r.repeat}" comes round next, so it was left open. Edit the repeat, or tick it off in the note.`;
+    if (r && r.reason === 'repeat') return `Rhythm: can't work out when "🔁 ${r.repeat}" comes round next, so it was left open. Edit the repeat, or tick it off in the note.`;
     /* The line was only found by its look-alike on a repeating reminder: the
        board was out of date, so ticking could have closed the wrong occurrence. */
-    if (r && r.reason === 'stale') return 'Nudge: that reminder changed since the board last read the note, so nothing was ticked. Here it is as it stands now.';
-    return 'Nudge: that line is no longer in the note.';
+    if (r && r.reason === 'stale') return 'Rhythm: that reminder changed since the board last read the note, so nothing was ticked. Here it is as it stands now.';
+    return 'Rhythm: that line is no longer in the note.';
   }
 
   /* A menu steals focus and gives it back to nobody: remember where it came
@@ -568,7 +568,7 @@ function mountBoard(view) {
     m.addItem(i => i.setTitle('Delete').setIcon('trash-2').onClick(() => once(it, async () => {
       const r = await store.remove(it);
       if (r && r.ok === false) gone(r, 'nothing was deleted');
-      else new Notice(`Nudge: removed "${it.title}".`);
+      else new Notice(`Rhythm: removed "${it.title}".`);
       await reload(from);
       await maybeExport();
     })));
@@ -606,7 +606,7 @@ function mountBoard(view) {
       isNew: true,
       onSave: async fields => {
         const r = await store.add(fields);
-        if (r && r.ok === false) { new Notice('Nudge: that reminder could not be added — nothing was written.'); return; }
+        if (r && r.ok === false) { new Notice('Rhythm: that reminder could not be added — nothing was written.'); return; }
         await reload(); await maybeExport();
       },
     });
@@ -623,7 +623,7 @@ function mountBoard(view) {
 
   async function exportICS() {
     const r = await store.exportICS();
-    new Notice(`Nudge: ${r.count} reminder${r.count === 1 ? '' : 's'} written to ${r.path}. Open it on your phone to add them to your calendar.`);
+    new Notice(`Rhythm: ${r.count} reminder${r.count === 1 ? '' : 's'} written to ${r.path}. Open it on your phone to add them to your calendar.`);
   }
 
   async function maybeExport() {
