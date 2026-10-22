@@ -1,10 +1,10 @@
 'use strict';
-/* The plugin's wiring that has no DOM in it, run against src/ with a stubbed
-   `obsidian`:
+/* The planner module's wiring that has no DOM in it, run against src/ with a
+   stubbed `obsidian`:
    - which vault events refresh the board (only notes it could be showing;
      'create' and 'resolved' only once the layout is ready, 'resolved' once);
-   - the commands wait for a tab restored at startup to load before they act;
-   - the settings tab tidies the paths and folders it saves. */
+   - the settings tab tidies the paths and folders it saves.
+   (The commands are Rhythm's now: tests/plugin-shell.test.cjs.) */
 const assert = require('node:assert');
 const Module = require('node:module');
 
@@ -78,12 +78,16 @@ const get = (list, name) => list.find(r => r.name === name);
 
 (async () => {
   try {
-    const FortnightPlugin = require('../src/planner/main');
+    const { attachPlanner } = require('../src/planner/host');
     const { FortnightSettingTab } = require('../src/planner/settings-tab');
+    const { MODULE_DEFAULTS } = require('../src/settings-merge');
 
     const app = fakeApp();
-    const p = new FortnightPlugin(app);
-    await p.onload();
+    const host = new Plugin(app);
+    host.settings = { name: '', weekStart: 1, planner: Object.assign({}, MODULE_DEFAULTS.planner) };
+    host.saveSettings = async () => {};
+    host.forEachEmbed = () => false;
+    const p = attachPlanner(host);
     let refreshes = 0;
     p.refreshSoon = () => { refreshes++; };
     const seen = [];
@@ -135,20 +139,6 @@ const get = (list, name) => list.find(r => r.name === name);
     p.store.isRelevant = () => { throw new Error('boom'); };
     get(app.on.meta, 'changed').cb({ path: 'Notes/essay.md' }, 'text', null);
     assert.strictEqual(refreshes, 9);
-
-    /* Commands wait for the tab to load and be revealed, then act on THAT view. */
-    const review = p.commands.find(c => c.id === 'review');
-    await review.callback();
-    assert.deepStrictEqual(app.log, ['loaded', 'revealed', 'openReview'], 'a deferred tab is loaded and revealed before Review opens');
-    app.log.length = 0;
-    app.leaf.view = null;
-    await p.commands.find(c => c.id === 'welcome').callback();
-    assert.deepStrictEqual(app.log, ['loaded', 'revealed', 'showIntro']);
-    app.log.length = 0;
-    await p.commands.find(c => c.id === 'open').callback();
-    assert.deepStrictEqual(app.log, ['loaded', 'revealed'], 'Open board only reveals');
-    const got = await p.activateView();
-    assert.strictEqual(got, app.leaf, 'activateView hands back the leaf');
 
     /* Settings: paths and folders are tidied as Obsidian tidies them. */
     const saved = [];

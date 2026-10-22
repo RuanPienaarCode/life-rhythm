@@ -19,24 +19,37 @@ const { openAddModal, openEditModal, openNextStepModal, openNoteModal } = requir
 const { refreshCalendars, calendarEvents, isStale, urls } = require('./calendar');
 const { applyAccent } = require('./accents');
 const { applyBackground } = require('./backgrounds');
+const { mountEmbed, EMBEDS } = require('./embed');
 
+/* Rhythm's own pages, and the two module boards (Reminders, Fortnight)
+   mounted as pages — see embed.js. */
 const TABS = [
   { id: 'today', label: 'Today' },
-  { id: 'plan', label: 'Plan' },
+  { id: 'reminders', label: 'Reminders' },
+  { id: 'fortnight', label: 'Fortnight' },
   { id: 'week', label: 'Week' },
   { id: 'month', label: 'Month' },
+  { id: 'plan', label: 'Plan' },
   { id: 'areas', label: 'Areas' },
 ];
+const isTab = id => TABS.some(t => t.id === id);
 
 function mountApp(view) {
   const plugin = view.plugin;
   const app = plugin.app;
-  const store = makeStore(plugin);
+  /* The plugin's one Rhythm store (one create queue for every writer);
+     a store of its own only where there is no plugin to share (tests). */
+  const store = plugin.rhythmStore || makeStore(plugin);
   const root = view.contentEl;
   root.classList.add('rv-app');
+  /* The board on screen when the page is Reminders or Fortnight. */
+  let embed = null;
+  /* Settles once the first load has landed (a board mounts only after it). */
+  let markLoaded;
+  const loaded = new Promise(r => { markLoaded = r; });
 
   const state = {
-    tab: 'today',
+    tab: isTab(view.initialTab) ? view.initialTab : 'today',
     date: D.todayISO(),
     data: { areas: [], practices: [], aside: [], goals: [], events: [], log: new Map() },
     loaded: false,
@@ -55,6 +68,11 @@ function mountApp(view) {
   let header, nav, main, toastEl, reloadTimer = null, toastTimer = null, stopped = false, resizeObserver = null;
 
   const fail = (what, e, msg) => { console.error('rhythm ' + what, e); new Notice('Rhythm: ' + msg); };
+  /* io.js refuses a write it cannot make safely and says why. */
+  const refusedText = r => (r.reason === 'unreadable'
+    ? `that day's note has a "${r.key}:" line Rhythm can't read as a list — open the note and fix it; nothing was changed.`
+    : r.reason === 'done-that-day' ? 'that is already done that day.' : 'nothing was changed.');
+  const refused = r => { if (r && r.refused) { new Notice('Rhythm: ' + refusedText(r.refused)); return true; } return false; };
 
   const ctx = {
     get state() { return state; },
@@ -68,6 +86,7 @@ function mountApp(view) {
     async toggle(name, date, on) {
       try {
         const r = await store.setDone(date, name, on);
+        if (refused(r)) return;
         await ctx.reload();
         ctx.toast(on ? `Ticked ${name}` : `Unticked ${name}`, 'Undo', () => ctx.restore(name, date, r && r.prev));
       } catch (e) { fail('toggle', e, 'could not save that tick.'); }
@@ -75,6 +94,7 @@ function mountApp(view) {
     async skip(name, date, on) {
       try {
         const r = await store.setSkip(date, name, on);
+        if (refused(r)) return;
         await ctx.reload();
         if (on) ctx.toast(`Not today: ${name}`, 'Undo', () => ctx.restore(name, date, r && r.prev));
       } catch (e) { fail('skip', e, 'could not save that.'); }
@@ -82,13 +102,15 @@ function mountApp(view) {
     async snooze(name, date, on) {
       try {
         const r = await store.setSnooze(date, name, on);
+        if (refused(r)) return;
         await ctx.reload();
         if (on) ctx.toast(`Later: ${name}`, 'Undo', () => ctx.restore(name, date, r && r.prev));
       } catch (e) { fail('snooze', e, 'could not save that.'); }
     },
     async restore(name, date, prev) {
       try {
-        await store.restoreFlags(date, name, prev);
+        const r = await store.restoreFlags(date, name, prev);
+        refused(r);
         await ctx.reload();
       } catch (e) { fail('undo', e, 'could not undo that.'); }
     },
@@ -112,7 +134,22 @@ function mountApp(view) {
       catch (e) { fail('log', e, 'could not open that day\'s note.'); }
     },
     setDate(iso) { state.date = iso; state.deckOffset = 0; state.enter = true; render(); },
-    setTab(id) { if (TABS.some(t => t.id === id)) { state.tab = id; state.deckOffset = 0; state.enter = true; render(); } },
+    setTab(id) {
+      if (!isTab(id) || id === state.tab) { if (isTab(id)) render(); return; }
+      state.tab = id; state.deckOffset = 0; state.enter = true;
+      render();
+      if (view.pageChanged) view.pageChanged(id);
+    },
+    /* Show a page and hand back its board once it is running (null for
+       Rhythm's own pages). */
+    async showPage(id) {
+      ctx.setTab(id);
+      await loaded;
+      if (!EMBEDS[id] || state.tab !== id) return null;
+      render();
+      return embed && embed.page === id ? embed.ready : null;
+    },
+    get embed() { return embed; },
     rerender() { render(); },
     async setAccent(id, hex) {
       plugin.settings.accent = id;
@@ -139,6 +176,7 @@ function mountApp(view) {
       try {
         const res = await store.movePlan(name, from, to);
         await ctx.reload();
+        if (refused(res)) return;
         ctx.toast(to ? `${name} → ${D.fmtShort(to)}` : `${name} back to waiting`, 'Undo', async () => {
           try { await undoMove(store, name, from, to, res); await ctx.reload(); }
           catch (e) { fail('plan', e, 'could not undo that.'); }
@@ -181,8 +219,9 @@ function mountApp(view) {
     },
     async reload() {
       try { state.data = await store.load(); state.loaded = true; }
-      catch (e) { fail('load', e, 'could not read the Rhythm folder.'); }
+      catch (e) { fail('load', e, 'could not read the Rhythm folder.'); state.loaded = true; }
       render();
+      markLoaded();
     },
     async seed() {
       try { await store.seed(); plugin.settings.onboarded = true; await plugin.saveSettings(); }
@@ -257,9 +296,17 @@ function mountApp(view) {
     el(header, 'div', 'rv-spacer');
     const gear = button(header, 'rv-gear', null, () => ctx.openSettings(), 'settings');
     gear.setAttribute('aria-label', 'Rhythm settings');
-    const add = button(header, 'rv-add', null, () => ctx.add(), 'plus');
-    add.setAttribute('aria-label', 'Add');
-    if (!state.loaded || !store.hasData()) add.disabled = true;
+    /* Add means what the page means: a reminder on Reminders, Fortnight's
+       own quick add on its board (so no button here), a practice, goal,
+       event or area everywhere else. */
+    if (state.tab === 'reminders') {
+      const add = button(header, 'rv-add', null, () => { if (embed && embed.ctl.ctx) embed.ctl.ctx.focusAdd(); }, 'plus');
+      add.setAttribute('aria-label', 'Add a reminder');
+    } else if (state.tab !== 'fortnight') {
+      const add = button(header, 'rv-add', null, () => ctx.add(), 'plus');
+      add.setAttribute('aria-label', 'Add');
+      if (!state.loaded || !store.hasData()) add.disabled = true;
+    }
 
     clear(nav);
     for (const t of TABS) {
@@ -267,7 +314,10 @@ function mountApp(view) {
       b.setAttribute('aria-selected', state.tab === t.id ? 'true' : 'false');
       b.setAttribute('role', 'tab');
     }
-    nav.hidden = !state.loaded || !store.hasData();
+    /* The module pages work without a Rhythm folder, so the tabs show as
+       soon as Rhythm has loaded; Rhythm's own pages show its setup card
+       until there is one. */
+    nav.hidden = !state.loaded;
   }
 
   function renderSetup() {
@@ -299,11 +349,33 @@ function mountApp(view) {
     applyBackground(root, plugin);
   }
 
+  /* A module board as the page. It is mounted once and left alone by
+     Rhythm's re-renders (a tick, a reload, the minute timer), which only
+     redraw the header around it. */
+  function showEmbed(page) {
+    if (embed && embed.page === page) return;
+    dropEmbed();
+    clear(main);
+    main.scrollTop = 0;
+    main.classList.add('is-embed');
+    const box = el(main, 'div', `rv-embed rv-embed-${page}` + (state.enter && plugin.settings.softEntrance !== false ? ' rv-embed-enter' : ''));
+    embed = mountEmbed(page, box, plugin, view);
+    embed.start();
+  }
+  function dropEmbed() {
+    if (!embed) return;
+    embed.stop();
+    embed = null;
+    main.classList.remove('is-embed');
+  }
+
   function render() {
     if (stopped) return;
     paintAccent();
     paintBackground();
     renderHeader();
+    if (EMBEDS[state.tab] && state.loaded) { showEmbed(state.tab); state.enter = false; return; }
+    dropEmbed();
     clear(main);
     main.scrollTop = 0;
     if (!state.loaded) { el(main, 'p', 'rv-muted rv-center', 'Loading…'); return; }
@@ -361,6 +433,8 @@ function mountApp(view) {
      today, N adds. Never while typing, never on mobile. */
   function onKey(e) {
     if (document.body.classList.contains('is-mobile')) return;
+    /* The module boards keep their own keys. */
+    if (EMBEDS[state.tab]) return;
     const t = e.target;
     if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;
     if (document.querySelector('.modal')) return;
@@ -423,8 +497,17 @@ function mountApp(view) {
       if (splash) splash.leave();
       if (isStale(plugin)) ctx.refreshCalendars(true);
     },
-    stop() { stopped = true; if (reloadTimer) clearTimeout(reloadTimer); if (toastTimer) clearTimeout(toastTimer); if (resizeObserver) resizeObserver.disconnect(); },
+    stop() { stopped = true; dropEmbed(); if (reloadTimer) clearTimeout(reloadTimer); if (toastTimer) clearTimeout(toastTimer); if (resizeObserver) resizeObserver.disconnect(); },
     render,
+    /* The pane was resized: a board that lays itself out by width (Fortnight's
+       phone view) is told. */
+    relayout() { if (embed && embed.ctl.relayout) embed.ctl.relayout(); },
+    /* Obsidian's theme or accent changed. */
+    restyle() {
+      if (!embed) return;
+      if (embed.ctl.restyle) embed.ctl.restyle();
+      if (embed.ctl.look) embed.ctl.look();
+    },
   };
 }
 

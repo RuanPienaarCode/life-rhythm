@@ -1,0 +1,60 @@
+/* ============================================================================
+   RHYTHM — module pages (build input, appended after the three stylesheets)
+
+   The Reminders and Fortnight boards (embed.js) keep their own stylesheets.
+   Both can borrow their colours from the theme — Nudge's "plain" surface
+   reads --background-primary / --text-normal / --text-accent, Fortnight's
+   "follow the accent" reads --interactive-accent — and the module settings
+   pin both to that mode. Inside a page those theme variables are re-pointed
+   at Rhythm's own tokens, so the boards wear Rhythm's look (its grouped
+   ground, its ink, its chosen accent, its wallpaper) with no edit to their
+   stylesheets.
+
+   Specificity: .rv-app .rv-embed... (0,3,0) beats each board's root rules
+   (.nd-app.is-plain, .theme-dark .fortnight — 0,2,0) without !important.
+   iOS 15 floor: no :has(), no container queries, no `inset`.
+   ============================================================================ */
+
+.rv-app .rv-main.is-embed { display: flex; flex-direction: column; overflow: hidden; }
+
+.rv-app .rv-embed {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 0;
+  --background-primary: var(--rv-bg);
+  --background-primary-alt: var(--rv-cell-2);
+  --background-secondary: var(--rv-cell);
+  --background-secondary-alt: var(--rv-cell-2);
+  --background-modifier-border: var(--rv-sep);
+  --background-modifier-border-hover: var(--rv-hair);
+  --background-modifier-hover: var(--rv-fill);
+  --background-modifier-active-hover: var(--rv-fill-2);
+  --text-normal: var(--rv-ink);
+  --text-muted: var(--rv-dim);
+  --text-faint: var(--rv-faint);
+  --text-accent: var(--rv-tint-text);
+  --interactive-accent: var(--rv-tint);
+  font-family: var(--rv-font);
+}
+/* With a wallpaper the boards are glass over it, like Rhythm's own pages. */
+.rv-app.has-bg .rv-embed { --background-primary: transparent; }
+
+/* The roots: each board was a whole view and sized itself to the leaf. */
+.rv-app .rv-embed.nd-app { height: auto; overflow: hidden; background: var(--nd-ground); }
+.rv-app .rv-embed.fortnight { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.rv-app .rv-embed.fortnight.fn-locked { overflow: hidden; }
+/* Fortnight's soft washes would sit over Rhythm's wallpaper as a second ground. */
+.rv-app.has-bg .rv-embed.fortnight { background-image: none; background-color: transparent; }
+
+/* The soft entrance, as Rhythm's own pages have it. */
+.rv-app .rv-embed.rv-embed-enter { animation: rv-slide 0.8s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* Seven pages: the segmented control (and the phone's bottom tab bar)
+   scrolls sideways rather than squeezing labels. */
+.rv-app .rv-tabs { overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.rv-app .rv-tabs::-webkit-scrollbar { display: none; }
+.rv-app button.rv-tab { flex: 1 0 auto; }
+
+@media (prefers-reduced-motion: reduce) {
+  .rv-app .rv-embed.rv-embed-enter { animation: none; }
+}

@@ -6,6 +6,21 @@ const { PROTOCOL } = require('./constants');
 const { refreshCalendars, calendarStatusLine } = require('./calendar');
 const { PRESETS, DEFAULT_ACCENT, swatchFor, customAccentPatch } = require('./accents');
 const BG = require('./backgrounds');
+const { NudgeSettingTab } = require('./reminders/settings-tab');
+const { FortnightSettingTab } = require('./planner/settings-tab');
+
+/* A module's own settings code, drawn into a section of this tab. Each is
+   the module's PluginSettingTab, run against a container of its own and
+   handed the module's host as its plugin. */
+function moduleSection(containerEl, app, Tab, host) {
+  if (!host) return;
+  const box = containerEl.createDiv();
+  const tab = Object.create(Tab.prototype);
+  tab.app = app;
+  tab.plugin = host;
+  tab.containerEl = box;
+  tab.display();
+}
 
 /* Obsidian's Setting shows a name beside its control but does not tie the two
    together for assistive tech, so each control is given the name too. */
@@ -22,6 +37,14 @@ class RhythmSettingTab extends PluginSettingTab {
     containerEl.empty();
     const s = this.plugin.settings;
     const save = async () => { await this.plugin.saveSettings(); this.plugin.refreshViews(); };
+
+    new Setting(containerEl)
+      .setName('Your name')
+      .setDesc('Used in the greetings on the Reminders and Fortnight pages. Leave it empty for none.')
+      .addText(t => {
+        named(t.inputEl, 'Your name');
+        t.setPlaceholder('Sam').setValue(s.name || '').onChange(async v => { s.name = String(v || '').trim(); await save(); });
+      });
 
     new Setting(containerEl)
       .setName('Folder')
@@ -217,7 +240,7 @@ class RhythmSettingTab extends PluginSettingTab {
         this.plugin.refreshViews();
       }));
 
-    containerEl.createEl('h3', { text: 'Reminders' });
+    containerEl.createEl('h3', { text: 'Deep link' });
     new Setting(containerEl)
       .setName('Deep link')
       .setDesc(`Obsidian cannot schedule notifications, but a Shortcuts automation on iPhone ("At 7:00, open URL") or a home-screen bookmark can open Rhythm at a set time. Link: obsidian://${PROTOCOL}?tab=today`)
@@ -225,6 +248,11 @@ class RhythmSettingTab extends PluginSettingTab {
         try { await navigator.clipboard.writeText(`obsidian://${PROTOCOL}?tab=today`); new Notice('Rhythm: link copied.'); }
         catch (e) { new Notice(`Rhythm: copy failed — the link is obsidian://${PROTOCOL}?tab=today`); }
       }));
+
+    containerEl.createEl('h2', { text: 'Reminders' });
+    moduleSection(containerEl, this.app, NudgeSettingTab, this.plugin.reminders);
+    containerEl.createEl('h2', { text: 'Fortnight' });
+    moduleSection(containerEl, this.app, FortnightSettingTab, this.plugin.planner);
   }
 
   cacheLine() {

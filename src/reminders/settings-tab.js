@@ -99,43 +99,49 @@ class NudgeSettingTab extends PluginSettingTab {
         new Notice(`Nudge: ${r.count} reminder${r.count === 1 ? '' : 's'} written to ${r.path}.`);
       }));
 
-    new Setting(c).setName('Look').setHeading();
+    /* Inside Rhythm the view wears Rhythm's look, and the name and
+       start-up choice are Rhythm's own settings. */
+    if (!this.plugin.embedded) {
+      new Setting(c).setName('Look').setHeading();
 
-    new Setting(c)
-      .setName('Surface')
-      .setDesc('Glass brings its own ground; plain borrows the colours of your Obsidian theme.')
-      .addDropdown(d => d.addOption('glass', 'Glass').addOption('plain', 'Plain')
-        .setValue(s.surface).onChange(async v => { s.surface = v; await save(); }));
+      new Setting(c)
+        .setName('Surface')
+        .setDesc('Glass brings its own ground; plain borrows the colours of your Obsidian theme.')
+        .addDropdown(d => d.addOption('glass', 'Glass').addOption('plain', 'Plain')
+          .setValue(s.surface).onChange(async v => { s.surface = v; await save(); }));
 
-    new Setting(c)
-      .setName('Light or dark')
-      .setDesc('The glass follows your Obsidian theme unless you pin it.')
-      .addDropdown(d => {
-        for (const m of MODES) d.addOption(m.id, m.label);
-        d.setValue(s.mode || 'auto').onChange(async v => { s.mode = v; await save(); });
-      });
+      new Setting(c)
+        .setName('Light or dark')
+        .setDesc('The glass follows your Obsidian theme unless you pin it.')
+        .addDropdown(d => {
+          for (const m of MODES) d.addOption(m.id, m.label);
+          d.setValue(s.mode || 'auto').onChange(async v => { s.mode = v; await save(); });
+        });
 
-    new Setting(c)
-      .setName('Tint')
-      .setDesc('The light behind the glass.')
-      .addDropdown(d => {
-        for (const t of TINTS) d.addOption(t.id, t.label);
-        d.setValue(s.tint).onChange(async v => { s.tint = v; await save(); });
-      });
+      new Setting(c)
+        .setName('Tint')
+        .setDesc('The light behind the glass.')
+        .addDropdown(d => {
+          for (const t of TINTS) d.addOption(t.id, t.label);
+          d.setValue(s.tint).onChange(async v => { s.tint = v; await save(); });
+        });
+    }
 
     new Setting(c)
       .setName('Sidebar')
       .setDesc('Views and lists beside the board. On a phone or a narrow pane it opens from the button beside the greeting instead.')
       .addToggle(t => t.setValue(s.sidebar !== false).onChange(async v => { s.sidebar = v; await save(); }));
 
-    new Setting(c)
-      .setName('Your name')
-      .setDesc('Used in the greeting. Leave it empty for none.')
-      .addText(t => t.setPlaceholder('Sam').setValue(s.name).onChange(async v => { s.name = String(v || '').trim(); await save(); }));
+    if (!this.plugin.embedded) {
+      new Setting(c)
+        .setName('Your name')
+        .setDesc('Used in the greeting. Leave it empty for none.')
+        .addText(t => t.setPlaceholder('Sam').setValue(s.name).onChange(async v => { s.name = String(v || '').trim(); await save(); }));
 
-    new Setting(c)
-      .setName('Open on startup')
-      .addToggle(t => t.setValue(s.openOnStartup).onChange(async v => { s.openOnStartup = v; await this.plugin.saveSettings(); }));
+      new Setting(c)
+        .setName('Open on startup')
+        .addToggle(t => t.setValue(s.openOnStartup).onChange(async v => { s.openOnStartup = v; await this.plugin.saveSettings(); }));
+    }
   }
 }
 
