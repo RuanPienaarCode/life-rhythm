@@ -93,18 +93,27 @@ function attachReminders(plugin) {
     },
   };
 
-  const raw = makeStore(host);
-  const store = Object.assign({}, raw);
-  for (const name of WRITES) {
-    const inner = raw[name];
-    if (typeof inner !== 'function') continue;
-    store[name] = async (...args) => {
-      const r = await inner(...args);
-      const wrote = !(r && (r.ok === false || r.changed === 0));
-      if (wrote) { host.refreshViews(); host.updateBadge(); plugin.changed(); }
-      return r;
-    };
-  }
+  /* A write that landed (not { ok: false }, not { changed: 0 }) refreshes
+     what shows the reminders — the boards unless the write came from one
+     (a board redraws itself), the badge, and the api's listeners. */
+  const notifying = (raw, refreshBoards) => {
+    const out = Object.assign({}, raw);
+    for (const name of WRITES) {
+      const inner = raw[name];
+      if (typeof inner !== 'function') continue;
+      out[name] = async (...args) => {
+        const r = await inner(...args);
+        const wrote = !(r && (r.ok === false || r.changed === 0));
+        if (wrote) { if (refreshBoards) host.refreshViews(); host.updateBadge(); plugin.changed(); }
+        return r;
+      };
+    }
+    return out;
+  };
+  const store = notifying(makeStore(host), true);
+  /* Each board's own store (its own write queue, as in Nudge): its writes
+     still reach the badge and the api. */
+  host.boardStore = () => notifying(makeStore(host), false);
   host.store = store;
 
   /* Someone edited the note by hand — including on another device, via

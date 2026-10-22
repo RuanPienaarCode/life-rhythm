@@ -117,6 +117,18 @@ const settle = () => new Promise(r => setTimeout(r, 5));
   await fire();
   assert.strictEqual(refreshes, hand + 1, 'a hand edit refreshes through the modify handler');
 
+  /* a board's own store: its writes reach the badge and the api, but do not
+     redraw the boards (the board that wrote redraws itself) */
+  {
+    const board = host.boardStore();
+    const before = { refreshes, badges, changes };
+    await board.add({ title: 'From the board', due: '2026-10-09', group: 'Home' });
+    assert.strictEqual(refreshes, before.refreshes, 'no board redraw');
+    assert.strictEqual(badges, before.badges + 1, 'the badge is told');
+    assert.strictEqual(changes, before.changes + 1, 'and the api');
+    assert.notStrictEqual(board, host.store, 'its own instance');
+  }
+
   /* start-up timer */
   assert.ok(host._startTimer, 'the start-up timer id is kept');
   const id = host._startTimer;

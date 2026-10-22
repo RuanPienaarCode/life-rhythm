@@ -36,7 +36,9 @@ function greeting(name) {
 function mountBoard(view) {
   const plugin = view.plugin;
   const app = plugin.app;
-  const store = makeStore(plugin);
+  /* Inside Rhythm the host hands the board a store whose writes also reach
+     the ribbon badge and the api's listeners. */
+  const store = typeof plugin.boardStore === 'function' ? plugin.boardStore() : makeStore(plugin);
   const root = view.contentEl;
 
   const state = { items: [], groups: [], lists: [], filter: 'all', group: '', query: '', tag: '', today: D.todayISO(), loaded: false, narrow: false, drawer: false, naming: false };
