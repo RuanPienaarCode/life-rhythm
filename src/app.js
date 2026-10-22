@@ -178,7 +178,7 @@ function mountApp(view) {
         await ctx.reload();
         if (refused(res)) return;
         ctx.toast(to ? `${name} → ${D.fmtShort(to)}` : `${name} back to waiting`, 'Undo', async () => {
-          try { await undoMove(store, name, from, to, res); await ctx.reload(); }
+          try { const u = await undoMove(store, name, from, to, res); await ctx.reload(); refused(u); }
           catch (e) { fail('plan', e, 'could not undo that.'); }
         });
       } catch (e) { fail('plan', e, 'could not move that.'); }

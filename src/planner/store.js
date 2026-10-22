@@ -3,7 +3,7 @@
    vault and the plugins it works with. The board model never touches the
    vault; it is handed what load() returns. */
 
-const { parseFrontmatter, patchFrontmatter, buildNote } = require('../markdown');
+const { parseFrontmatter } = require('../markdown');
 const L = require('./tasks-line');
 const { plannerPathOf } = require('./plan');
 const { reviewText } = require('./review');
@@ -380,13 +380,17 @@ function makeStore(plugin) {
       const lead = !text ? '' : text.endsWith(eol) ? eol : eol + eol;
       return text + lead + block;
     };
+    /* A day's log that does not exist yet is made by Rhythm (its frontmatter,
+       its create queue); the review is then appended to its body. */
+    if (isRhythmLog && !app.vault.getFileByPath(path)) {
+      const rr = rhythmRoot();
+      if (rr) await rr.store.ensureLogNote(date);
+    }
     const file = app.vault.getFileByPath(path);
     if (file) { await app.vault.process(file, append); return { ok: true, path }; }
     await ensureFolders(folder);
-    /* A new Rhythm log starts exactly as Rhythm starts one (done: []). */
-    const start = isRhythmLog ? patchFrontmatter(buildNote({ rhythm: 'log' }, ''), { done: [] }) : '';
     try {
-      await app.vault.create(path, append(start));
+      await app.vault.create(path, append(''));
     } catch (e) {
       /* Lost a race (Rhythm made the day's log meanwhile): append to it. */
       const now = app.vault.getFileByPath(path);
@@ -529,9 +533,13 @@ function makeStore(plugin) {
       /* Two writes, new day first (as Rhythm's movePlan): a failure half way
          leaves the practice on one of the days, never on neither. */
       if (!card.fromTray && card.date === date) return { ok: true };
-      const on = await setRhythmFlag(date, 'plan', card.text, true);
-      if (!on.ok || card.fromTray || !card.date) return on;
-      return setRhythmFlag(card.date, 'plan', card.text, false);
+      const rr = rhythmRoot();
+      if (!rr) return { ok: false, reason: 'no-rhythm' };
+      /* Rhythm's own move: new day first, and a refusal on the old day takes
+         the new day's promise back, so it is never planned on two days. */
+      const from = card.fromTray || !card.date ? null : card.date;
+      const r = await rr.store.movePlan(card.text, from, date, { refuseIfDone: true });
+      return r && r.refused ? { ok: false, reason: r.refused.reason } : { ok: true };
     }
     return { ok: false, reason: 'unknown' };
   }

@@ -20,11 +20,14 @@ const EMBEDS = {
 function mountEmbed(page, el, plugin, view) {
   const spec = EMBEDS[page];
   const intervals = [];
+  let stopped = false;
   const stand = {
     contentEl: el,
     plugin: spec.host(plugin),
     app: plugin.app,
-    registerInterval(id) { intervals.push(id); return id; },
+    /* A board that registers its timer only once its first load lands can
+       do so after the page was already left: clear that one at once. */
+    registerInterval(id) { if (stopped) window.clearInterval(id); else intervals.push(id); return id; },
     registerEvent(ref) { if (view && view.registerEvent) view.registerEvent(ref); },
     registerDomEvent(target, type, fn, opts) {
       if (view && view.registerDomEvent) view.registerDomEvent(target, type, fn, opts);
@@ -32,7 +35,6 @@ function mountEmbed(page, el, plugin, view) {
     },
   };
   const ctl = spec.mount(stand);
-  let stopped = false;
   const embed = {
     page,
     kind: spec.kind,

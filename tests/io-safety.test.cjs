@@ -111,6 +111,31 @@ const reads = (text, key) => {
     assert.strictEqual(vault.store.get(`Rhythm/Log/${from}.md`), fromText, 'the old day keeps its promise');
   }
 
+  {
+    /* the OLD day is the unreadable one: the new day's promise is taken back,
+       so it is planned on one day, not two */
+    const from = '2026-10-21';
+    const fromText = '---\nrhythm: log\nplan: [Gym,\n  Read]\n---\n';
+    const toText = '---\nrhythm: log\ndone: []\n---\n';
+    const { vault, store } = storeOver({ [`Rhythm/Log/${from}.md`]: fromText, [LOG]: toText });
+    const r = await store.movePlan('Gym', from, DAY);
+    assert.deepStrictEqual(r.refused, { reason: 'unreadable', key: 'plan' });
+    assert.strictEqual(vault.store.get(`Rhythm/Log/${from}.md`), fromText, 'the unreadable note is untouched');
+    assert.strictEqual(vault.store.get(LOG), toText, 'and the new day is back as it was');
+  }
+  {
+    /* undoMove says when its undo was refused */
+    const { undoMove } = require('../src/day-menu');
+    const from = '2026-10-21';
+    const { vault, store } = storeOver({ [`Rhythm/Log/${from}.md`]: '---\nrhythm: log\nplan: [Gym]\n---\n', [LOG]: '---\nrhythm: log\ndone: []\n---\n' });
+    const res = await store.movePlan('Gym', from, DAY);
+    assert.ok(!res.refused);
+    vault.store.set(LOG, '---\nrhythm: log\nplan: [Gym,\n  Read]\n---\n');
+    const u = await undoMove(store, 'Gym', from, DAY, res);
+    assert.deepStrictEqual(u.refused, { reason: 'unreadable', key: 'plan' });
+    assert.deepStrictEqual(await undoMove(storeOver({}).store, 'X', null, null, { prev: {} }), {}, 'nothing refused: {}');
+  }
+
   /* ---- 4. the log window: only notes inside it are read at all ------- */
   {
     const files = {};

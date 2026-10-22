@@ -35,6 +35,7 @@ const REASON = {
   repeat: "its repeat's next date couldn't be worked out",
   'done-today': "it's already done today — that promise is kept for its day",
   'done-that-day': "that practice is already done on that day",
+  unreadable: "that day's note in Rhythm/Log has a list line Rhythm can't read — open the note and fix it; nothing was changed",
   missing: 'its note no longer exists',
   'no-nudge': "reminders aren't available",
   'no-rhythm': "Rhythm isn't available",

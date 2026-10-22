@@ -515,7 +515,12 @@ function makeStore(plugin) {
     }
     if (from) {
       const r = await setPlan(from, name, false);
-      if (r.refused) return { prev, refused: r.refused };
+      if (r.refused) {
+        /* The old day's note could not be changed: take the promise back off
+           the new day too, so the practice is planned on one day, not two. */
+        if (to && prev.to) await restoreFlags(to, name, prev.to);
+        return { prev: { from: null, to: null }, refused: r.refused };
+      }
       prev.from = r.prev;
     }
     return { prev };
