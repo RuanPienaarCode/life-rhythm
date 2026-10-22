@@ -10,6 +10,7 @@
 
 const { el, button, icon } = require('./dom');
 const { dayMenu } = require('./widgets');
+const { dayOptions, moveFrom } = require('./day-menu');
 const M = require('./model');
 
 const VISIBLE = 4;      // cards drawn; deeper ones would not be seen
@@ -68,10 +69,12 @@ function renderDeck(page, ctx, plan, date) {
 
     /* The fourth answer, on its own line because it is the one that asks a
        follow-up question rather than settling the card outright. */
-    const another = button(card, 'rv-deck-btn rv-deck-another', 'Another day', ev => {
-      dayMenu(ev, another, ctx, r.p.name, date, d => exit('is-gone-right', () => ctx.movePlan(r.p.name, null, d)));
-    }, 'calendar');
-    another.setAttribute('aria-label', `Another day for ${r.p.name}`);
+    if (dayOptions(r.p, date, ctx.settings.weekStart).length) {
+      const another = button(card, 'rv-deck-btn rv-deck-another', 'Another day', ev => {
+        dayMenu(ev, another, ctx, r, date, d => exit('is-gone-right', () => ctx.movePlan(r.p.name, moveFrom(r.pr, date), d)));
+      }, 'calendar');
+      another.setAttribute('aria-label', `Another day for ${r.p.name}`);
+    }
 
     swipe(card, {
       left: () => exit('is-gone-left', () => ctx.skip(r.p.name, date, true)),

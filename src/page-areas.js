@@ -107,13 +107,13 @@ function practiceLine(ctx, p, today) {
   const body = el(row, 'div', 'rv-row-body');
   body.addEventListener('click', () => ctx.edit('practice', p));
   el(body, 'div', 'rv-row-name rv-row-name-sub', p.name);
-  const since = M.lastDone(ctx.state.data.log, p.name, today);
+  const info = M.sinceInfo(p, ctx.state.data.log, today);
   const bits = [M.cadenceLabel(M.parseCadence(p.cadence))];
   if (p.time) bits.push(p.time);
   else if (p.when) bits.push(p.when);
-  bits.push(M.sinceLabel(since));
+  bits.push(info.label);
   const meta = el(body, 'div', 'rv-row-meta', bits.join(' · '));
-  if (since === null || since > 13) meta.classList.add('is-cold');
+  if (info.cold) meta.classList.add('is-cold');
   const more = button(row, 'rv-row-more', null, ev => {
     const menu = new Menu();
     menu.addItem(m => m.setTitle('Edit').setIcon('pencil').onClick(() => ctx.edit('practice', p)));

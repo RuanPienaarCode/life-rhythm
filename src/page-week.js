@@ -53,6 +53,7 @@ function renderWeek(page, ctx) {
     const ta = el(q, 'textarea', 'rv-input rv-textarea');
     ta.rows = 3;
     ta.placeholder = 'One honest line is enough.';
+    ta.setAttribute('aria-label', 'What would make next week lighter?');
     const actions = el(q, 'div', 'rv-review-actions');
     const save = button(actions, 'rv-btn rv-btn-primary', 'Save to the day\'s note', async () => {
       const text = ta.value.trim();

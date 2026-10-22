@@ -77,4 +77,22 @@ A.applyAccent({ style: { setProperty: (k, v) => { seen[k] = v; } } }, { accent: 
 assert.strictEqual(Object.keys(seen).length, 10);
 assert.strictEqual(seen['--rv-tint-l'], '#6a9b85');
 A.applyAccent(null, { accent: 'sage' }); // must not throw
+/* ---- settings: a custom hex is only kept when it parses ---- */
+assert.deepStrictEqual(A.customAccentPatch('#c0392b'), { accent: 'custom', accentHex: '#c0392b' });
+assert.deepStrictEqual(A.customAccentPatch('C0392B'), { accent: 'custom', accentHex: '#c0392b' }, 'no hash, upper case');
+assert.deepStrictEqual(A.customAccentPatch('#abc'), { accent: 'custom', accentHex: '#aabbcc' }, 'short form expands');
+assert.deepStrictEqual(A.customAccentPatch(' abc '), { accent: 'custom', accentHex: '#aabbcc' }, 'surrounding spaces ignored');
+for (const bad of ['', '#', '#c0392', '#c0392b1', '#c0', 'c0392g', 'red', null, undefined]) {
+  assert.strictEqual(A.customAccentPatch(bad), null, `${JSON.stringify(bad)} is not a colour`);
+}
+/* Typing "#c0392b" then deleting a character: the settings keep the last valid colour. */
+{
+  const st = { accent: 'slate', accentHex: '' };
+  for (const typed of ['#', '#c', '#c0', '#c03', '#c039', '#c0392', '#c0392b', '#c0392']) {
+    const patch = A.customAccentPatch(typed);
+    if (patch) Object.assign(st, patch);
+  }
+  assert.deepStrictEqual(st, { accent: 'custom', accentHex: '#c0392b' }, 'delete one char keeps #c0392b');
+}
+
 console.log(`accents OK (${A.PRESETS.length} presets, both themes)`);

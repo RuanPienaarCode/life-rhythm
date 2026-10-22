@@ -45,6 +45,11 @@ class ItemModal extends Modal {
       body: '', status: r.status || 'active', aside: !!r.aside, days: r.days || null,
     };
     this.quick = '';
+    /* Which fields the user actually touched, so a Save on an edit only
+       ever writes what changed — leaving an unrecognised value (a renamed
+       area, a wikilinked one) alone rather than quietly overwriting it
+       with whatever the form happened to default to. */
+    this.touched = new Set();
   }
 
   onOpen() {
@@ -68,6 +73,7 @@ class ItemModal extends Modal {
 
     if (!editing) {
       const q = input(c, 'rv-input rv-quick', { type: 'text', placeholder: 'Type it fast: Practice guitar daily 20min @evening #Craft', value: this.quick, autocomplete: 'off' });
+      q.setAttribute('aria-label', 'Add something: type it in one line');
       q.addEventListener('input', () => {
         this.quick = q.value;
         const p = parseQuickAdd(q.value, areas);
@@ -120,38 +126,43 @@ class ItemModal extends Modal {
       return node;
     };
     const nameInput = field('Name', input(null, 'rv-input', { type: 'text', placeholder: 'Name', value: v.name, autocomplete: 'off' }));
-    nameInput.addEventListener('input', () => { v.name = nameInput.value; });
+    nameInput.addEventListener('input', () => { v.name = nameInput.value; this.touched.add('name'); });
 
     if (this.kind !== 'area') {
-      if (!areaOpts.length) el(form, 'p', 'rv-muted', 'No areas yet — add an area first.');
+      /* An area the current value doesn't match — renamed out from under
+         it, or written as a wikilink — is kept as its own option, shown
+         as-is, rather than silently reset to the first area in the list. */
+      let opts = areaOpts;
+      if (v.area && !opts.some(o => o.value === v.area)) opts = [{ value: v.area, label: v.area }, ...opts];
+      if (!opts.length) el(form, 'p', 'rv-muted', 'No areas yet — add an area first.');
       else {
-        if (!v.area || !areaOpts.some(o => o.value === v.area)) v.area = areaOpts[0].value;
-        const areaSel = field('Area', select(null, 'rv-input', areaOpts, v.area));
-        areaSel.addEventListener('change', () => { v.area = areaSel.value; });
+        if (!v.area) v.area = opts[0].value;
+        const areaSel = field('Area', select(null, 'rv-input', opts, v.area));
+        areaSel.addEventListener('change', () => { v.area = areaSel.value; this.touched.add('area'); });
       }
     }
 
     if (this.kind === 'practice') {
       if (!CADENCES.some(c => c.value === v.cadence)) CADENCES.push({ value: v.cadence, label: v.cadence });
       const cad = field('How often', select(null, 'rv-input', CADENCES, v.cadence));
-      cad.addEventListener('change', () => { v.cadence = cad.value; });
+      cad.addEventListener('change', () => { v.cadence = cad.value; this.touched.add('cadence'); });
       const when = field('When', select(null, 'rv-input', WHEN_OPTS, v.when));
-      when.addEventListener('change', () => { v.when = when.value; });
+      when.addEventListener('change', () => { v.when = when.value; this.touched.add('when'); });
       const at = field('At (optional)', input(null, 'rv-input', { type: 'time', value: v.time }));
-      at.addEventListener('input', () => { v.time = at.value; });
+      at.addEventListener('input', () => { v.time = at.value; this.touched.add('time'); });
       const mins = field('Minutes', input(null, 'rv-input', { type: 'number', inputmode: 'numeric', min: '1', placeholder: 'Minutes', value: v.minutes }));
-      mins.addEventListener('input', () => { v.minutes = mins.value; });
+      mins.addEventListener('input', () => { v.minutes = mins.value; this.touched.add('minutes'); });
     } else if (this.kind === 'goal') {
       const next = field('Next step', input(null, 'rv-input', { type: 'text', placeholder: 'The one next step', value: v.next }));
-      next.addEventListener('input', () => { v.next = next.value; });
+      next.addEventListener('input', () => { v.next = next.value; this.touched.add('next'); });
       const hz = field('By (month)', input(null, 'rv-input', { type: 'text', inputmode: 'numeric', placeholder: 'YYYY-MM', value: v.horizon }));
-      hz.addEventListener('input', () => { v.horizon = hz.value; });
+      hz.addEventListener('input', () => { v.horizon = hz.value; this.touched.add('horizon'); });
     } else if (this.kind === 'event') {
       if (!v.date) v.date = D.todayISO();
       const date = field('Date', input(null, 'rv-input', { type: 'date', value: v.date }));
-      date.addEventListener('input', () => { v.date = date.value; });
+      date.addEventListener('input', () => { v.date = date.value; this.touched.add('date'); });
       const time = field('Time', input(null, 'rv-input', { type: 'time', value: v.time }));
-      time.addEventListener('input', () => { v.time = time.value; });
+      time.addEventListener('input', () => { v.time = time.value; this.touched.add('time'); });
     } else if (!editing) {
       const note = field('About', input(null, 'rv-input', { type: 'text', placeholder: 'A line about what this area is for', value: v.body }));
       note.addEventListener('input', () => { v.body = note.value; });
@@ -168,10 +179,14 @@ class ItemModal extends Modal {
     if (kind === 'event' && !D.isISO(v.date)) { new Notice('Rhythm: pick a date.'); return; }
     this.close();
     if (this.rec) {
+      const candidate = {};
+      if (kind === 'practice') { candidate.area = v.area; candidate.cadence = v.cadence; candidate.when = v.when || undefined; candidate.time = (v.time || '').trim() || undefined; candidate.minutes = v.minutes ? parseInt(v.minutes, 10) : undefined; }
+      else if (kind === 'goal') { candidate.area = v.area; candidate.next = (v.next || '').trim() || undefined; candidate.horizon = (v.horizon || '').trim() || undefined; }
+      else if (kind === 'event') { candidate.area = v.area; candidate.date = v.date; candidate.time = (v.time || '').trim() || undefined; }
+      /* Only the fields the user actually touched go to disk — opening and
+         saving without touching anything must be a no-op. */
       const fields = {};
-      if (kind === 'practice') { fields.area = v.area; fields.cadence = v.cadence; fields.when = v.when || undefined; fields.time = (v.time || '').trim() || undefined; fields.minutes = v.minutes ? parseInt(v.minutes, 10) : undefined; }
-      else if (kind === 'goal') { fields.area = v.area; fields.next = (v.next || '').trim() || undefined; fields.horizon = (v.horizon || '').trim() || undefined; }
-      else if (kind === 'event') { fields.area = v.area; fields.date = v.date; fields.time = (v.time || '').trim() || undefined; }
+      for (const k of Object.keys(candidate)) if (this.touched.has(k)) fields[k] = candidate[k];
       await this.ctx.update(this.rec, fields, name);
       return;
     }

@@ -51,24 +51,33 @@ const quote = (t, s, e) => E.linePrefix(t, s, e, 'quote');
 const heading = (t, s, e) => E.linePrefix(t, s, e, 'heading');
 const number = (t, s, e) => E.linePrefix(t, s, e, 'number');
 
-assert.strictEqual(run('one|', bullet), '«- one»');
-assert.strictEqual(run('- one|', bullet), '«one»', 'and off again');
-assert.strictEqual(run('«one\ntwo»', bullet), '«- one\n- two»');
+/* A collapsed caret never selects the inserted/removed marker — it stays
+   collapsed at the same logical spot in the text, so the next keystroke
+   continues the line instead of retyping over a highlighted prefix. */
+assert.strictEqual(run('one|', bullet), '- one|', 'a collapsed caret stays collapsed, after the marker');
+assert.strictEqual(run('- one|', bullet), 'one|', 'and off again, still collapsed');
+assert.strictEqual(run('«one\ntwo»', bullet), '«- one\n- two»', 'a real selection still selects the block');
 assert.strictEqual(run('«- one\n- two»', bullet), '«one\ntwo»', 'off only when every line has it');
 assert.strictEqual(run('«- one\ntwo»', bullet), '«- one\n- two»', 'a mixed block turns all of it on');
 assert.strictEqual(run('«one\ntwo\nthree»', number), '«1. one\n2. two\n3. three»');
 assert.strictEqual(run('«- one\n- two»', task), '«- [ ] one\n- [ ] two»', 'a bullet becomes a task rather than stacking');
 assert.strictEqual(run('«- [ ] one»', bullet), '«- one»', 'and back the other way');
 assert.strictEqual(run('«- [x] done»', task), '«done»', 'a ticked task toggles off too');
-assert.strictEqual(run('one|', heading), '«### one»');
-assert.strictEqual(run('## one|', heading), '«one»', 'any heading level toggles off');
-assert.strictEqual(run('one|', quote), '«> one»');
-assert.strictEqual(run('  indented|', bullet), '«  - indented»', 'indentation is kept');
-assert.strictEqual(run('  - indented|', bullet), '«  indented»');
+assert.strictEqual(run('one|', heading), '### one|');
+assert.strictEqual(run('## one|', heading), 'one|', 'any heading level toggles off, collapsed');
+assert.strictEqual(run('one|', quote), '> one|');
+assert.strictEqual(run('  indented|', bullet), '  - indented|', 'indentation is kept, caret stays collapsed');
+assert.strictEqual(run('  - indented|', bullet), '  indented|');
 assert.strictEqual(run('«one\n\ntwo»', bullet), '«- one\n\n- two»', 'a blank line inside a block stays blank');
 
 /* A selection ending exactly on a line break belongs to the line before. */
 assert.strictEqual(run('«one\n»two', bullet), '«- one»\ntwo');
+
+/* ---- M5: collapsed-caret line prefix, the exact cases from the audit ---- */
+assert.deepStrictEqual(E.linePrefix('', 0, 0, 'task'), { text: '- [ ] ', start: 6, end: 6 },
+  'an empty line: the caret lands right after the marker, ready to type');
+assert.deepStrictEqual(E.linePrefix('abc', 1, 1, 'bullet'), { text: '- abc', start: 3, end: 3 },
+  'a mid-line collapsed caret moves by the length of the inserted prefix');
 
 /* ---- links ---- */
 assert.strictEqual(run('«Obsidian»', E.link), '[Obsidian](«url»)');

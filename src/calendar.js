@@ -23,31 +23,46 @@ function isStale(plugin) {
   return !c || !c.fetchedAt || Date.now() - c.fetchedAt > STALE_MS;
 }
 
-/* Fetch every subscribed calendar; keep whatever succeeded. */
+/* Fetch every subscribed calendar; keep whatever succeeded, and for any
+   link that failed keep that link's own previous events rather than
+   dropping them (each event carries the `source` URL it was fetched
+   from). A cache from before per-event `source` tagging existed cannot be
+   attributed to one URL — when every link fails we fall back to keeping
+   such untagged events wholesale, same as before this fix. */
 async function refreshCalendars(plugin) {
   const list = urls(plugin);
   const today = D.todayISO();
   const from = D.addDays(today, -BACK_DAYS), to = D.addDays(today, AHEAD_DAYS);
+  const prev = plugin.settings.calendarCache || {};
+  const prevEvents = Array.isArray(prev.events) ? prev.events : [];
+  const prevTagged = prevEvents.filter(e => e.source != null);
+  const prevUntagged = prevEvents.filter(e => e.source == null);
   const events = [];
   const errors = [];
+  const failedUrls = new Set();
   for (const url of list) {
     try {
       const res = await requestUrl({ url, method: 'GET', throw: false });
-      if (!res || !(res.status >= 200 && res.status < 400)) { errors.push(`${url}: HTTP ${res ? res.status : '?'}`); continue; }
+      if (!res || !(res.status >= 200 && res.status < 400)) { errors.push(`${url}: HTTP ${res ? res.status : '?'}`); failedUrls.add(url); continue; }
       for (const e of parseICS(res.text, from, to)) events.push({ ...e, source: url });
     } catch (e) {
       errors.push(`${url}: ${e && e.message ? e.message : e}`);
+      failedUrls.add(url);
     }
   }
-  /* Keep whatever succeeded. When EVERY link failed (offline, a subway,
-     an iCloud hiccup) the old events are still the best we have: leave
-     them and leave fetchedAt alone so the next open retries. */
-  const prev = plugin.settings.calendarCache || {};
-  const allFailed = list.length > 0 && errors.length >= list.length;
-  if (allFailed) {
-    plugin.settings.calendarCache = { ...prev, events: prev.events || [], errors, lastAttemptAt: Date.now() };
+  if (failedUrls.size > 0) {
+    for (const url of failedUrls) for (const e of prevTagged) if (e.source === url) events.push(e);
+    /* Legacy untagged cache: only safe to reuse wholesale when we cannot
+       tell success from failure per link, i.e. every link failed. */
+    if (failedUrls.size === list.length) events.push(...prevUntagged);
+    /* At least one link failed: leave fetchedAt alone (never advance it to
+       "now") so the cache is not marked fresh for the full 6h — the next
+       open retries against the old staleness clock instead. Links that
+       did succeed still contribute fresh events above. */
+    const allFailed = list.length > 0 && failedUrls.size >= list.length;
+    plugin.settings.calendarCache = { ...prev, events, errors, lastAttemptAt: Date.now() };
     await plugin.saveSettings();
-    return { events: prev.events || [], errors, offline: true };
+    return allFailed ? { events, errors, offline: true } : { events, errors };
   }
   plugin.settings.calendarCache = { fetchedAt: Date.now(), lastAttemptAt: Date.now(), events, errors };
   await plugin.saveSettings();
@@ -63,4 +78,32 @@ function calendarEvents(plugin) {
   }));
 }
 
-module.exports = { refreshCalendars, calendarEvents, isStale, urls };
+/* "5 min ago" / "3 h ago" / "3 d ago". */
+function agoText(ms, now) {
+  const mins = Math.round(Math.max(0, now - ms) / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins} min ago`;
+  const hours = Math.round(mins / 60);
+  return hours < 48 ? `${hours} h ago` : `${Math.round(hours / 24)} d ago`;
+}
+
+/* The one-line calendar status shown in settings, from the cache that
+   refreshCalendars keeps (fetchedAt = last full or partial success,
+   lastAttemptAt = last try of any outcome, errors = the last try's failures).
+   A failed attempt is always said so — even before anything ever loaded. */
+function calendarStatusLine(cache, now) {
+  const c = cache || {};
+  const t = now == null ? Date.now() : now;
+  const failed = Array.isArray(c.errors) ? c.errors.length : 0;
+  const tried = c.lastAttemptAt ? `last tried ${agoText(c.lastAttemptAt, t)}` : '';
+  if (!c.fetchedAt) {
+    if (!failed) return 'Not fetched yet.';
+    return `Couldn't load: ${failed} link(s)${tried ? ` — ${tried}` : ''}.`;
+  }
+  const n = Array.isArray(c.events) ? c.events.length : 0;
+  const base = `${n} event${n === 1 ? '' : 's'} cached, fetched ${agoText(c.fetchedAt, t)}`;
+  if (!failed) return `${base}.`;
+  return `${base} · couldn't load ${failed} link(s)${tried ? `, ${tried}` : ''}.`;
+}
+
+module.exports = { refreshCalendars, calendarEvents, isStale, urls, calendarStatusLine };

@@ -136,11 +136,19 @@ function applyAccent(node, settings) {
   for (const k of Object.keys(vars)) node.style.setProperty(k, vars[k]);
 }
 
+/* What to save when the custom-colour box holds `value`: the settings patch
+   for a colour that parses (stored as '#rrggbb'), or null for anything else,
+   so a half-typed or half-deleted value never replaces the last valid one. */
+function customAccentPatch(value) {
+  const rgb = parseHex(value);
+  return rgb ? { accent: 'custom', accentHex: toHex(rgb) } : null;
+}
+
 /* The swatch shown in settings: the light-theme fill, so the dot looks
    like what a tick will look like. */
 const swatchFor = (id, customHex) => toHex(nudge(baseOf(id, customHex), BLACK, CELL_LIGHT, 3));
 
 module.exports = {
   PRESETS, DEFAULT_ACCENT, accentVars, applyAccent, swatchFor,
-  parseHex, toHex, contrast, luminance, nudge, inkOn, CELL_LIGHT, CELL_DARK,
+  parseHex, toHex, customAccentPatch, contrast, luminance, nudge, inkOn, CELL_LIGHT, CELL_DARK,
 };
