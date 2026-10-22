@@ -1,0 +1,105 @@
+'use strict';
+/* Settings: the welcome, and which folders stay off the board. */
+
+const { PluginSettingTab, Setting, normalizePath } = require('obsidian');
+const { DEFAULT_SETTINGS } = require('./constants');
+const { tidyPath, folderLines } = require('./board-helpers');
+
+class FortnightSettingTab extends PluginSettingTab {
+  constructor(app, plugin) {
+    super(app, plugin);
+    this.plugin = plugin;
+  }
+
+  /* A planner note inside an excluded folder: its to-dos would never show. */
+  warnIfHidden(el) {
+    const path = this.plugin.store.plannerPath();
+    const hidden = (this.plugin.settings.excludeFolders || []).find(f => {
+      const dir = String(f).replace(/^\/+|\/+$/g, '');
+      return dir && path.startsWith(dir + '/');
+    });
+    el.setText(hidden ? `The planner note is inside the excluded folder "${hidden}", so to-dos added from the board won't show on it.` : '');
+  }
+
+  display() {
+    const { containerEl } = this;
+    containerEl.empty();
+    new Setting(containerEl)
+      .setName('Your name')
+      .setDesc('Used in the daily greeting. Leave blank for just "Good morning".')
+      .addText(t => t
+        .setValue(this.plugin.settings.name || '')
+        .onChange(async v => { this.plugin.settings.name = v.trim(); await this.plugin.saveSettings(); }));
+    new Setting(containerEl)
+      .setName('Colour')
+      .setDesc('Fortnight\'s own blue, or your Obsidian accent colour (Settings → Appearance → Accent color).')
+      .addDropdown(d => d
+        .addOption('blue', 'Blue')
+        .addOption('theme', 'Follow Obsidian\'s accent')
+        .setValue(this.plugin.settings.accent === 'theme' ? 'theme' : 'blue')
+        .onChange(async v => { this.plugin.settings.accent = v; await this.plugin.saveSettings(); }));
+    new Setting(containerEl)
+      .setName('Daily welcome')
+      .setDesc('The first time you open Fortnight each day: a greeting, then "Plan the week" or "Plan today", fading into the board.')
+      .addToggle(t => t
+        .setValue(this.plugin.settings.showWelcome !== false)
+        .onChange(async v => { this.plugin.settings.showWelcome = v; await this.plugin.saveSettings(); }));
+    new Setting(containerEl)
+      .setName('Planner note')
+      .setDesc('Where "Add a to-do" writes new to-dos, under an "## Inbox" heading. Created if it doesn\'t exist.')
+      .addText(t => t
+        .setPlaceholder('Planning/Fortnight.md')
+        .setValue(this.plugin.settings.plannerNote || '')
+        .onChange(async v => {
+          /* Tidied as Obsidian tidies a path (one kind of slash, none at the
+             ends); the box keeps what was typed. */
+          this.plugin.settings.plannerNote = tidyPath(v, normalizePath, true) || DEFAULT_SETTINGS.plannerNote;
+          await this.plugin.saveSettings();
+          this.warnIfHidden(warning);
+        }));
+    const warning = containerEl.createDiv({ cls: 'setting-item-description mod-warning' });
+    this.warnIfHidden(warning);
+    new Setting(containerEl)
+      .setName('Review folder')
+      .setDesc('Where "Review today" adds its summary, as a note per day (YYYY-MM-DD). Leave blank for Rhythm\'s log folder (or "Reviews" without Rhythm).')
+      .addText(t => t
+        .setPlaceholder('Rhythm/Log')
+        .setValue(this.plugin.settings.reviewFolder || '')
+        .onChange(async v => { this.plugin.settings.reviewFolder = tidyPath(v, normalizePath); await this.plugin.saveSettings(); }));
+    new Setting(containerEl)
+      .setName('Later: also show undated to-dos from')
+      .setDesc('Later always shows the planner note\'s undated to-dos. Add folders here to include theirs too. One folder per line.')
+      .addTextArea(t => t
+        .setPlaceholder('Projects')
+        .setValue((this.plugin.settings.laterFolders || []).join('\n'))
+        .onChange(async v => {
+          this.plugin.settings.laterFolders = folderLines(v, normalizePath);
+          await this.plugin.saveSettings();
+        }));
+    new Setting(containerEl)
+      .setName('Later tag')
+      .setDesc('A to-do from another note that you drop on Later gets this tag, so it stays in Later. Putting it back on a day removes it.')
+      .addText(t => t
+        .setPlaceholder('#later')
+        .setValue(this.plugin.settings.laterTag || '#later')
+        .onChange(async v => {
+          /* Only what Obsidian reads as part of a tag: letters, digits, _ - / */
+          const tag = v.trim().replace(/^#+/, '').replace(/[^\p{L}\p{N}_\-/]/gu, '');
+          this.plugin.settings.laterTag = tag ? (tag.startsWith('#') ? tag : `#${tag}`) : '#later';
+          await this.plugin.saveSettings();
+        }));
+    new Setting(containerEl)
+      .setName('Excluded folders')
+      .setDesc('To-dos in these folders never appear on the board. One folder per line, e.g. Templates.')
+      .addTextArea(t => t
+        .setPlaceholder('Templates')
+        .setValue((this.plugin.settings.excludeFolders || []).join('\n'))
+        .onChange(async v => {
+          this.plugin.settings.excludeFolders = folderLines(v, normalizePath);
+          await this.plugin.saveSettings();
+          this.warnIfHidden(warning);
+        }));
+  }
+}
+
+module.exports = { FortnightSettingTab };
