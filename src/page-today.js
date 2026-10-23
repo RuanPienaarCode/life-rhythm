@@ -1,5 +1,6 @@
 'use strict';
-/* Today — the page that keeps the list short. */
+/* Habits — the page that keeps the list short (Today until 0.2.0; Today
+   is now page-now.js, everything due today). */
 
 const { el, button, icon } = require('./dom');
 const D = require('./dates');
@@ -14,7 +15,7 @@ function renderToday(page, ctx) {
   const today = D.todayISO();
   const plan = M.planDay(state.data, date, { focusCount: settings.focusCount, weekStart: settings.weekStart });
   const diff = D.diffDays(today, date);
-  const title = diff === 0 ? 'Today' : diff === -1 ? 'Yesterday' : diff === 1 ? 'Tomorrow' : D.DAY_NAMES[D.weekday(date)];
+  const title = diff === 0 ? 'Habits' : diff === -1 ? 'Yesterday' : diff === 1 ? 'Tomorrow' : D.DAY_NAMES[D.weekday(date)];
 
   titleBar(page, D.fmtLong(date), title, {
     prev: () => ctx.setDate(D.addDays(date, -1)),
