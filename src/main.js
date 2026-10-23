@@ -143,8 +143,16 @@ class RhythmPlugin extends Plugin {
     if (this._api) this._api.stop();
   }
 
-  /* Something changed that another plugin may be showing. */
-  changed() { if (this._api) this._api.notify(); }
+  /* Something changed that another plugin, or the Today page, may be
+     showing. */
+  changed() {
+    if (this._api) this._api.notify();
+    this.feedChanged();
+  }
+
+  /* The Today page's list is made of every module's lines: any of them
+     changing (a write here, a hand edit, a sync) redraws it. */
+  feedChanged() { this.forEachView(ctl => { if (ctl.ctx.feedChanged) ctl.ctx.feedChanged(); }); }
 
   /* Rhythm's store as a module uses it: a write made from the planner or
      through the api also redraws the Rhythm pages (their watcher takes io.js

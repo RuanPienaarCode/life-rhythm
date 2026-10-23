@@ -18,7 +18,7 @@ const DEFAULT_SETTINGS = {
   showPrompt: true,
   /* The welcome screen and the soft entrance of each page. */
   softEntrance: true,
-  /* How Today shows what is outstanding: 'list' or 'deck'. */
+  /* How the Habits page shows what is outstanding: 'list' or 'deck'. */
   todayView: 'list',
   /* The one colour that carries meaning. An id from accents.js PRESETS, or
      'custom' with accentHex. */

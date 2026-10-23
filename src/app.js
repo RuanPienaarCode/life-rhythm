@@ -10,6 +10,9 @@ const { makeStore } = require('./io');
 const D = require('./dates');
 const M = require('./model');
 const { renderToday } = require('./page-today');
+const { renderNow } = require('./page-now');
+const { loadFeed } = require('./today-feed');
+const { why } = require('./planner/board');
 const { renderWeek } = require('./page-week');
 const { renderMonth } = require('./page-month');
 const { renderAreas } = require('./page-areas');
@@ -24,7 +27,10 @@ const { mountEmbed, EMBEDS } = require('./embed');
 /* Rhythm's own pages, and the two module boards (Reminders, Fortnight)
    mounted as pages — see embed.js. */
 const TABS = [
+  /* Everything due today, from every module (page-now.js). */
   { id: 'today', label: 'Today' },
+  /* The practices page (page-today.js) — "Today" until 0.2.0. */
+  { id: 'habits', label: 'Habits' },
   { id: 'reminders', label: 'Reminders' },
   { id: 'fortnight', label: 'Fortnight' },
   { id: 'week', label: 'Week' },
@@ -60,12 +66,18 @@ function mountApp(view) {
     /* Which card the deck has in front — purely visual, reset whenever the
        page changes so you never return to a stale position. */
     deckOffset: 0,
+    /* The Today page's list (today-feed.js): kept while a fresh one loads, so
+       a reload never flashes the page empty. */
+    feed: null,
+    feedStale: false,
+    feedError: false,
     /* Set whenever the page changes (tab, date, first load) so the next
        render eases in; cleared after that render so a tick never re-animates. */
     enter: true,
   };
 
   let header, nav, main, toastEl, reloadTimer = null, toastTimer = null, stopped = false, resizeObserver = null;
+  let feedLoading = false, feedAgain = false;
 
   const fail = (what, e, msg) => { console.error('rhythm ' + what, e); new Notice('Rhythm: ' + msg); };
   /* io.js refuses a write it cannot make safely and says why. */
@@ -150,6 +162,35 @@ function mountApp(view) {
       return embed && embed.page === id ? embed.ready : null;
     },
     get embed() { return embed; },
+    /* Today's list: one read at a time; a change during a read asks for one more. */
+    loadFeed() {
+      if (feedLoading) { feedAgain = true; return; }
+      feedLoading = true;
+      state.feedStale = false;
+      loadFeed(plugin, state.data, D.todayISO())
+        .then(f => { state.feed = f; state.feedError = false; }, e => { console.error('rhythm today', e); state.feedError = true; })
+        .then(() => {
+          feedLoading = false;
+          if (feedAgain) { feedAgain = false; state.feedStale = true; }
+          if (state.tab === 'today') render();
+        });
+    },
+    /* Something the list is made of changed: redraw from a fresh read. */
+    feedChanged() {
+      state.feedStale = true;
+      if (state.tab === 'today' && state.loaded) render();
+    },
+    /* Tick a to-do or a reminder the way the Fortnight board does. */
+    async tickCard(card) {
+      if (card.done) return;
+      let r;
+      try { r = await plugin.planner.store.tick(card, D.todayISO()); }
+      catch (e) { console.error('rhythm tick', e); r = { ok: false, reason: 'error' }; }
+      if (r && r.ok === false) { if (r.reason !== 'busy') new Notice(`Rhythm: couldn't tick "${card.text}": ${why(r.reason)}.`); }
+      else ctx.toast(`Done: ${card.text}`);
+      ctx.feedChanged();
+    },
+    openCard(card) { plugin.planner.openTask(card); },
     rerender() { render(); },
     async setAccent(id, hex) {
       plugin.settings.accent = id;
@@ -218,7 +259,7 @@ function mountApp(view) {
       } catch (e) { fail('note', e, 'could not save that note.'); }
     },
     async reload() {
-      try { state.data = await store.load(); state.loaded = true; }
+      try { state.data = await store.load(); state.loaded = true; state.feedStale = true; }
       catch (e) { fail('load', e, 'could not read the Rhythm folder.'); state.loaded = true; }
       render();
       markLoaded();
@@ -381,7 +422,8 @@ function mountApp(view) {
     if (!state.loaded) { el(main, 'p', 'rv-muted rv-center', 'Loading…'); return; }
     if (!store.hasData()) { renderSetup(); return; }
     const page = el(main, 'div', `rv-page rv-page-${state.tab}`);
-    if (state.tab === 'today') renderToday(page, ctx);
+    if (state.tab === 'today') renderNow(page, ctx);
+    else if (state.tab === 'habits') renderToday(page, ctx);
     else if (state.tab === 'plan') renderPlan(page, ctx);
     else if (state.tab === 'week') renderWeek(page, ctx);
     else if (state.tab === 'month') renderMonth(page, ctx);
@@ -440,7 +482,7 @@ function mountApp(view) {
     if (document.querySelector('.modal')) return;
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     const k = e.key;
-    if (/^[1-7]$/.test(k) && state.tab === 'today') {
+    if (/^[1-7]$/.test(k) && state.tab === 'habits') {
       const plan = M.planDay(state.data, state.date, { focusCount: plugin.settings.focusCount, weekStart: plugin.settings.weekStart });
       const r = plan.focus[parseInt(k, 10) - 1];
       if (r) { e.preventDefault(); ctx.toggle(r.p.name, state.date, true); }
@@ -449,7 +491,7 @@ function mountApp(view) {
     if (k === 'ArrowLeft' || k === 'ArrowRight') {
       const dir = k === 'ArrowLeft' ? -1 : 1;
       e.preventDefault();
-      if (state.tab === 'today') ctx.setDate(D.addDays(state.date, dir));
+      if (state.tab === 'habits') ctx.setDate(D.addDays(state.date, dir));
       else if (state.tab === 'week' || state.tab === 'plan') ctx.setDate(D.addDays(state.date, 7 * dir));
       else if (state.tab === 'month') ctx.setDate(D.addMonths(state.date, dir));
       return;
@@ -489,7 +531,8 @@ function mountApp(view) {
       if (view.registerInterval) {
         view.registerInterval(window.setInterval(() => {
           const t = D.todayISO();
-          if (state.date !== t && state.tab === 'today' && state.date === D.addDays(t, -1)) { state.date = t; render(); }
+          if (state.date !== t && state.tab === 'habits' && state.date === D.addDays(t, -1)) { state.date = t; render(); }
+          if (state.tab === 'today' && state.feed && state.feed.today !== t) render();
         }, 60000));
       }
       const splash = plugin.settings.softEntrance !== false ? showSplash() : null;

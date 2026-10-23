@@ -31,7 +31,7 @@ function attachPlanner(plugin) {
     refreshViews() { plugin.forEachEmbed('planner', ctl => ctl.refresh()); },
     refreshSoon() {
       window.clearTimeout(soon);
-      soon = window.setTimeout(() => host.refreshViews(), 300);
+      soon = window.setTimeout(() => { host.refreshViews(); if (plugin.feedChanged) plugin.feedChanged(); }, 300);
     },
     /* Open the note a card lives in, at its line. */
     async openTask(card) {

@@ -59,7 +59,7 @@ class RhythmSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Things in front of you')
-      .setDesc('How many practices Today shows before the rest fold away under "When there\'s space".')
+      .setDesc('How many practices the Habits page (and Today) puts in front of you before the rest fold away under "When there\'s space".')
       .addSlider(sl => {
         named(sl.sliderEl, 'Things in front of you');
         sl.setLimits(1, 7, 1).setValue(s.focusCount).setDynamicTooltip().onChange(async v => {
@@ -180,10 +180,10 @@ class RhythmSettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
-      .setName('Today shows')
+      .setName('Habits shows')
       .setDesc('A list of everything outstanding, or one card at a time from a deck you can swipe through.')
       .addDropdown(d => {
-        named(d.selectEl, 'Today shows');
+        named(d.selectEl, 'Habits shows');
         d.addOption('list', 'A list').addOption('deck', 'One at a time').setValue(s.todayView || 'list').onChange(async v => {
           s.todayView = v;
           await save();
