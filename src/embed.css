@@ -36,14 +36,19 @@
   --interactive-accent: var(--rv-tint);
   font-family: var(--rv-font);
 }
-/* With a wallpaper the boards are glass over it, like Rhythm's own pages. */
-.rv-app.has-bg .rv-embed { --background-primary: transparent; }
-
 /* The roots: each board was a whole view and sized itself to the leaf. */
 .rv-app .rv-embed.nd-app { height: auto; overflow: hidden; background: var(--nd-ground); }
 .rv-app .rv-embed.fortnight { overflow-y: auto; -webkit-overflow-scrolling: touch; }
 .rv-app .rv-embed.fortnight.fn-locked { overflow: hidden; }
-/* Fortnight's soft washes would sit over Rhythm's wallpaper as a second ground. */
+
+/* With a wallpaper only the two ROOTS go clear, so the wallpaper shows
+   behind the board. --background-primary itself stays a solid colour: both
+   boards also use it as TEXT on a filled control (Nudge's selected filter
+   chip, Fortnight's Finish button) and as the ground of their overlays
+   (Fortnight's welcome, tap sheet, review, sticky week header) — made
+   transparent, the chip's label vanished on its white pill and the
+   overlays let the board show through. tests/embed-css.test.cjs holds this. */
+.rv-app.has-bg .rv-embed.nd-app { background: transparent; }
 .rv-app.has-bg .rv-embed.fortnight { background-image: none; background-color: transparent; }
 
 /* The soft entrance, as Rhythm's own pages have it. */
