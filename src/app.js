@@ -349,11 +349,22 @@ function mountApp(view) {
       if (!state.loaded || !store.hasData()) add.disabled = true;
     }
 
+    /* Eight tabs scroll sideways on a phone. The bar is rebuilt on every
+       render, so keep where it was scrolled to, and bring the page you are
+       on into view (Plan and Areas start past the right edge). */
+    const scrolled = nav.scrollLeft;
     clear(nav);
     for (const t of TABS) {
       const b = button(nav, 'rv-tab' + (state.tab === t.id ? ' is-active' : ''), t.label, () => ctx.setTab(t.id));
       b.setAttribute('aria-selected', state.tab === t.id ? 'true' : 'false');
       b.setAttribute('role', 'tab');
+    }
+    nav.scrollLeft = scrolled;
+    const on = nav.querySelector('.rv-tab.is-active');
+    if (on && nav.scrollWidth > nav.clientWidth) {
+      const nb = nav.getBoundingClientRect(), ab = on.getBoundingClientRect();
+      if (ab.left < nb.left) nav.scrollLeft -= nb.left - ab.left + 12;
+      else if (ab.right > nb.right) nav.scrollLeft += ab.right - nb.right + 12;
     }
     /* The module pages work without a Rhythm folder, so the tabs show as
        soon as Rhythm has loaded; Rhythm's own pages show its setup card

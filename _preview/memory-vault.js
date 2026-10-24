@@ -27,6 +27,9 @@ export function makeMemoryVault(initial) {
       return { path: p, children };
     },
     getFileByPath(p) { return files.has(p) ? fileObj(p) : null; },
+    getAbstractFileByPath(p) { return files.has(p) ? fileObj(p) : null; },
+    getMarkdownFiles() { return [...files.keys()].filter(p => p.endsWith('.md')).map(fileObj); },
+    getFiles() { return [...files.keys()].map(fileObj); },
     async cachedRead(f) { return files.get(f.path) ?? ''; },
     async read(f) { return files.get(f.path) ?? ''; },
     async create(p, content) { if (files.has(p)) throw new Error('exists: ' + p); ensureParents(p); files.set(p, content); emit('create', fileObj(p)); return fileObj(p); },

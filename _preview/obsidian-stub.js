@@ -1,3 +1,32 @@
+/* Obsidian adds DOM helpers (createDiv, createEl, empty, addClass…) to
+   every element; the Reminders and Fortnight boards use them, so the stub
+   adds the same ones (as Fortnight's own harness did). */
+const proto = HTMLElement.prototype;
+if (!proto.createEl) {
+  const node = Node.prototype;
+  node.createEl = function (tag, o = {}) {
+    const el = document.createElement(tag);
+    if (typeof o === 'string') o = { cls: o };
+    if (o.cls) el.className = Array.isArray(o.cls) ? o.cls.filter(Boolean).join(' ') : o.cls;
+    if (o.text != null) el.textContent = o.text;
+    if (o.attr) for (const k of Object.keys(o.attr)) el.setAttribute(k, o.attr[k]);
+    this.appendChild(el);
+    return el;
+  };
+  node.createDiv = function (o) { return this.createEl('div', typeof o === 'string' ? { cls: o } : o); };
+  node.createSpan = function (o) { return this.createEl('span', typeof o === 'string' ? { cls: o } : o); };
+  proto.setText = function (t) { this.textContent = t; };
+  proto.empty = function () { while (this.firstChild) this.removeChild(this.firstChild); };
+  proto.addClass = function (...c) { this.classList.add(...c); };
+  proto.removeClass = function (...c) { this.classList.remove(...c); };
+  proto.toggleClass = function (c, on) { this.classList.toggle(c, on); };
+  proto.isShown = function () { return !!this.offsetParent; };
+}
+if (!window.createFragment) window.createFragment = cb => { const f = document.createDocumentFragment(); if (cb) cb(f); return f; };
+/* ?phone=1 — Obsidian on a phone (Platform, and the body classes it sets). */
+const PHONE = new URLSearchParams(location.search).get('phone') === '1';
+export const Platform = { isMobile: PHONE, isPhone: PHONE, isDesktop: !PHONE };
+
 /* Minimal `obsidian` stand-in for the browser harness. setIcon draws a plain
    24x24 stroke path per name so the layout matches what lucide occupies. */
 const PATHS = {
@@ -108,6 +137,7 @@ export class Menu {
 export class Plugin {}
 export class ItemView {}
 export class PluginSettingTab {}
+export class FuzzySuggestModal {}
 export class Setting {}
 export class TFile {}
 export class TFolder {}

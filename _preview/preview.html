@@ -26,6 +26,9 @@
   .stub-menu button:hover { background: #f0f0f0; }
   body.theme-dark .stub-menu { background: #2a2a2e; } body.theme-dark .stub-menu button { color: #eee; } body.theme-dark .stub-menu button:hover { background: #3a3a3e; }
   body.is-mobile-sim .frame { max-width: 390px; }
+  /* ?phone=1: the frame is the phone screen. */
+  body.is-phone { background: #fff; }
+  body.is-phone .frame { top: 0; right: 0; bottom: 0; left: 0; max-width: none; border-radius: 0; box-shadow: none; }
 </style>
 </head>
 <body>

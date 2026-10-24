@@ -874,6 +874,15 @@
 .rv-app button.rv-nav::after,
 .rv-app button.rv-gear::after { top: -6px; right: -6px; bottom: -6px; left: -6px; }      /* 32 -> 44 */
 .rv-app.is-narrow button.rv-tab::after { top: -7px; right: 0; bottom: -7px; left: 0; }   /* ~31 tall -> 45 */
+/* On a phone-narrow pane the List / One-at-a-time switch (28 tall) and the
+   Week page's day dots (26 x 22) get the same treatment: a taller hit area
+   that stays inside their row, so a thumb lands on them. */
+.rv-app.is-narrow button.rv-viewseg-btn,
+.rv-app.is-narrow button.rv-cell { position: relative; }
+.rv-app.is-narrow button.rv-viewseg-btn::after,
+.rv-app.is-narrow button.rv-cell::after { content: ''; position: absolute; }
+.rv-app.is-narrow button.rv-viewseg-btn::after { top: -8px; right: 0; bottom: -8px; left: 0; }   /* 28 -> 44 */
+.rv-app.is-narrow button.rv-cell::after { top: -11px; right: 0; bottom: -11px; left: 0; }          /* 22 -> 44 */
 
 @media (prefers-reduced-motion: reduce) {
   .rv-app * { transition: none !important; animation: none !important; }
