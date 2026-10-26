@@ -1,20 +1,29 @@
 /* ============================================================================
    RHYTHM — styles (build input; root styles.css is a copy of this file)
 
-   Direction: "Apple" (design/07-apple.html). Faithful to the Human Interface
-   Guidelines: SF system stack, a Large Title over the content, inset grouped
-   lists on systemGroupedBackground, leading-inset separators, systemBlue as
-   the only colour doing work, a translucent toolbar. Dark mode flips the
-   tokens to Apple's dark grouped palette.
+   Direction: "Frost" (design/11-mono-frost.html). Black and white, with
+   frosted glass on every surface. The ground is a near-white (or black)
+   field with a few soft grey shapes in it, so the panes over it have
+   something to frost even with no wallpaper. Lists, the hero, the toolbar,
+   the phone tab bar and the board's columns are glass: a translucent fill,
+   a DESATURATING blur (so a colour wallpaper reads grey behind the panes),
+   a lit edge and a highlight along the top. Corners follow Redpeak: 14px
+   for cards, lists and banners, 9px for small controls, pills round.
+   Still the Human Interface Guidelines underneath: SF system stack, a
+   Large Title over the content, inset grouped lists, leading-inset
+   separators. Nothing glows in colour; every halo and shadow is black or
+   white at some alpha.
 
-   One deliberate deviation from Apple's tokens: secondaryLabel sits at 0.72
-   alpha rather than 0.60 so metadata clears WCAG AA on both cell backgrounds.
+   Secondary text sits at 0.80 / 0.70 alpha so metadata clears WCAG AA on
+   the glass, and the overdue red is iOS's high-contrast pair (#d70015 /
+   #ff6961): #ff3b30 is under 4.5:1 as small text on white.
 
    The accent is NOT written here. src/accents.js derives six values per
    theme from the chosen colour and sets them as inline custom properties on
    the view root; this file only maps them, picking the light or dark set on
    .theme-dark so nothing has to be recomputed when the theme flips. The
-   values below are the fallbacks (Slate) for the moment before that runs.
+   default is Mono (black in light, white in dark); the fallbacks below are
+   Mono too, for the moment before that runs.
    --rv-tint fills things; --rv-tint-text is the same colour taken far
    enough for 4.5:1 as WORDS. Use the text one for any `color:`.
 
@@ -25,34 +34,63 @@
        rules — EVERY rule that styles a button carries the .rv-app ancestor.
      - app.css's input[type=text]:hover (0,2,1) beats .rv-app .rv-input —
        the :hover rule below reclaims it.
-   iOS 15 floor: -webkit- prefixed backdrop-filter, no `inset` shorthand, no
-   container queries, word-break fallback before overflow-wrap: anywhere.
+   iOS 15 floor: -webkit- prefixed backdrop-filter (with an @supports
+   fallback to near-opaque fills), no `inset` shorthand, no container
+   queries, word-break fallback before overflow-wrap: anywhere.
    ============================================================================ */
 
 .rv-app {
-  --rv-bg: #f2f2f7;
+  --rv-bg: #ebebee;
+  /* The soft shapes the glass frosts. Grey only. */
+  --rv-ground:
+    radial-gradient(40% 28% at 10% 4%, #ffffff 0%, rgba(255, 255, 255, 0) 100%),
+    radial-gradient(42% 30% at 96% 20%, #d4d4d9 0%, rgba(212, 212, 217, 0) 100%),
+    radial-gradient(60% 36% at 22% 62%, #dadade 0%, rgba(218, 218, 222, 0) 100%),
+    radial-gradient(46% 30% at 92% 94%, #ffffff 0%, rgba(255, 255, 255, 0) 100%),
+    radial-gradient(30% 22% at 70% 48%, #f7f7f8 0%, rgba(247, 247, 248, 0) 100%);
+  /* Solid surfaces: what must never let anything through (the deck's
+     stacked cards, the drag ghost, the module boards' overlays). */
   --rv-cell: #ffffff;
-  --rv-cell-2: #f7f7f9;
-  --rv-toolbar: rgba(249, 249, 249, 0.78);
+  --rv-cell-2: #f4f4f6;
+  /* Glass: panes (lists, hero, columns), chrome (toolbar, tab bar), and a
+     brighter film for cards that sit ON a pane (no blur of their own). */
+  --rv-glass: rgba(255, 255, 255, 0.56);
+  --rv-glass-2: rgba(255, 255, 255, 0.40);
+  --rv-glass-chrome: rgba(255, 255, 255, 0.70);
+  --rv-glass-blur: saturate(70%) blur(24px);
+  --rv-glass-edge: rgba(255, 255, 255, 0.85);
+  --rv-glass-line: rgba(0, 0, 0, 0.07);
+  --rv-glass-hi: rgba(255, 255, 255, 0.95);
+  --rv-glass-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 10px 30px rgba(0, 0, 0, 0.07);
+  --rv-card: rgba(255, 255, 255, 0.72);
   --rv-ink: #000000;
-  --rv-dim: rgba(60, 60, 67, 0.78);
+  --rv-dim: rgba(60, 60, 67, 0.80);
   /* faint is for NON-text only (icons, dots, rings): 3:1 on every surface.
      Anything readable uses --rv-dim, which is 4.5:1 or better. */
   --rv-faint: rgba(60, 60, 67, 0.6);
-  --rv-sep: rgba(60, 60, 67, 0.29);
-  --rv-hair: rgba(0, 0, 0, 0.16);
-  --rv-fill: rgba(116, 116, 128, 0.08);
-  --rv-fill-2: rgba(116, 116, 128, 0.14);
-  --rv-tint: var(--rv-tint-l, #386382);
-  --rv-tint-text: var(--rv-tint-text-l, #386382);
+  --rv-sep: rgba(60, 60, 67, 0.20);
+  --rv-hair: rgba(0, 0, 0, 0.10);
+  --rv-fill: rgba(118, 118, 128, 0.10);
+  --rv-fill-2: rgba(118, 118, 128, 0.18);
+  --rv-tint: var(--rv-tint-l, #0a0a0a);
+  --rv-tint-text: var(--rv-tint-text-l, #0a0a0a);
   --rv-tint-ink: var(--rv-tint-ink-l, #ffffff);
-  --rv-tint-soft: var(--rv-tint-soft-l, rgba(56, 99, 130, 0.10));
-  --rv-tint-band: var(--rv-tint-band-l, rgba(56, 99, 130, 0.09));
-  --rv-warn: #ff3b30;
+  --rv-tint-soft: var(--rv-tint-soft-l, rgba(0, 0, 0, 0.06));
+  --rv-tint-band: var(--rv-tint-band-l, rgba(0, 0, 0, 0.05));
+  --rv-warn: #d70015;
+  /* Segmented controls: a sunken track, the chosen segment a raised glass chip. */
   --rv-seg-bg: rgba(118, 118, 128, 0.12);
-  --rv-seg-on: #ffffff;
-  --rv-seg-shadow: 0 3px 8px rgba(0, 0, 0, 0.12), 0 1px 1px rgba(0, 0, 0, 0.04);
-  --rv-ring: rgba(60, 60, 67, 0.60);
+  --rv-seg-on: rgba(255, 255, 255, 0.92);
+  --rv-seg-shadow: inset 0 1px 0 #ffffff, 0 0 0 0.5px rgba(0, 0, 0, 0.06), 0 3px 8px rgba(0, 0, 0, 0.12);
+  --rv-ring: rgba(60, 60, 67, 0.62);
+  /* The splash: a neutral halo and ring, never a colour. */
+  --rv-halo-1: rgba(0, 0, 0, 0.10);
+  --rv-halo-2: rgba(0, 0, 0, 0.04);
+  --rv-splash-ring: rgba(0, 0, 0, 0.42);
+  /* Redpeak's corners and its settle curve. */
+  --rv-radius: 14px;
+  --rv-radius-sm: 9px;
+  --rv-ease: cubic-bezier(0.16, 1, 0.3, 1);
   --rv-font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif;
 
   position: relative;
@@ -62,6 +100,8 @@
   padding: 0;
   overflow: hidden;
   background-color: var(--rv-bg);
+  background-image: var(--rv-ground);
+  background-size: 100% 100%;
   color: var(--rv-ink);
   font-family: var(--rv-font);
   font-size: 15px;
@@ -72,35 +112,52 @@
 
 .theme-dark .rv-app {
   --rv-bg: #000000;
+  --rv-ground:
+    radial-gradient(40% 28% at 10% 4%, #262629 0%, rgba(38, 38, 41, 0) 100%),
+    radial-gradient(42% 30% at 96% 20%, #18181b 0%, rgba(24, 24, 27, 0) 100%),
+    radial-gradient(60% 36% at 22% 62%, #1f1f23 0%, rgba(31, 31, 35, 0) 100%),
+    radial-gradient(46% 30% at 92% 94%, #262629 0%, rgba(38, 38, 41, 0) 100%),
+    radial-gradient(30% 22% at 70% 48%, #141416 0%, rgba(20, 20, 22, 0) 100%);
   --rv-cell: #1c1c1e;
   --rv-cell-2: #242426;
-  --rv-toolbar: rgba(28, 28, 30, 0.78);
+  --rv-glass: rgba(44, 44, 48, 0.48);
+  --rv-glass-2: rgba(44, 44, 48, 0.32);
+  --rv-glass-chrome: rgba(30, 30, 33, 0.58);
+  --rv-glass-edge: rgba(255, 255, 255, 0.13);
+  --rv-glass-line: rgba(0, 0, 0, 0.5);
+  --rv-glass-hi: rgba(255, 255, 255, 0.12);
+  --rv-glass-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 10px 30px rgba(0, 0, 0, 0.55);
+  --rv-card: rgba(255, 255, 255, 0.08);
   --rv-ink: #ffffff;
-  --rv-dim: rgba(235, 235, 245, 0.66);
-  --rv-faint: rgba(235, 235, 245, 0.42);
-  --rv-sep: rgba(84, 84, 88, 0.70);
+  --rv-dim: rgba(235, 235, 245, 0.70);
+  --rv-faint: rgba(235, 235, 245, 0.45);
+  --rv-sep: rgba(255, 255, 255, 0.12);
   --rv-hair: rgba(255, 255, 255, 0.14);
-  --rv-fill: rgba(118, 118, 128, 0.18);
-  --rv-fill-2: rgba(118, 118, 128, 0.28);
-  --rv-tint: var(--rv-tint-d, #5c7f98);
-  --rv-tint-text: var(--rv-tint-text-d, #67889f);
-  --rv-tint-ink: var(--rv-tint-ink-d, #0d1b24);
-  --rv-tint-soft: var(--rv-tint-soft-d, rgba(92, 127, 152, 0.18));
-  --rv-tint-band: var(--rv-tint-band-d, rgba(92, 127, 152, 0.14));
-  --rv-warn: #ff453a;
+  --rv-fill: rgba(118, 118, 128, 0.20);
+  --rv-fill-2: rgba(118, 118, 128, 0.32);
+  --rv-tint: var(--rv-tint-d, #ffffff);
+  --rv-tint-text: var(--rv-tint-text-d, #ffffff);
+  --rv-tint-ink: var(--rv-tint-ink-d, #000000);
+  --rv-tint-soft: var(--rv-tint-soft-d, rgba(255, 255, 255, 0.10));
+  --rv-tint-band: var(--rv-tint-band-d, rgba(255, 255, 255, 0.08));
+  --rv-warn: #ff6961;
   --rv-seg-bg: rgba(118, 118, 128, 0.24);
-  --rv-seg-on: #636366;
-  --rv-seg-shadow: 0 3px 8px rgba(0, 0, 0, 0.32);
-  --rv-ring: rgba(235, 235, 245, 0.42);
+  --rv-seg-on: rgba(120, 120, 128, 0.55);
+  --rv-seg-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 3px 8px rgba(0, 0, 0, 0.4);
+  --rv-ring: rgba(235, 235, 245, 0.50);
+  --rv-halo-1: rgba(255, 255, 255, 0.16);
+  --rv-halo-2: rgba(255, 255, 255, 0.05);
+  --rv-splash-ring: rgba(255, 255, 255, 0.5);
 }
 
 /* app.css paints .workspace-leaf-content .view-content (0,2,0) with
    --background-primary, which beats .rv-app (0,1,0): without this the
-   grouped grey ground never shows and white cards vanish into white. */
-/* background-COLOR, never the `background` shorthand: the shorthand also
-   resets background-image, and this rule outranks the wallpaper rule
-   below — which is how the wallpaper silently failed to appear. */
-.workspace-leaf-content .view-content.rv-app { padding: 0; overflow: hidden; background-color: var(--rv-bg); color: var(--rv-ink); }
+   grey ground never shows and white cards vanish into white. */
+/* background-COLOR and -IMAGE, never the `background` shorthand: the
+   shorthand also resets background-size and the rest, and the wallpaper
+   rule below has to win on every one of them — a shorthand here is how the
+   wallpaper silently failed to appear once. */
+.workspace-leaf-content .view-content.rv-app { padding: 0; overflow: hidden; background-color: var(--rv-bg); background-image: var(--rv-ground); color: var(--rv-ink); }
 
 .rv-app * { box-sizing: border-box; }
 .rv-app .rv-icon { display: inline-flex; width: 18px; height: 18px; align-items: center; justify-content: center; flex: none; }
@@ -109,6 +166,7 @@
 
 /* ---- toolbar + segmented tabs ---------------------------------------- */
 
+/* Docked glass over the ground: content scrolls under it. */
 .rv-app .rv-top {
   position: relative;
   z-index: 2;
@@ -117,13 +175,13 @@
   gap: 14px;
   height: 52px;
   padding: 0 16px;
-  background: var(--rv-toolbar);
-  -webkit-backdrop-filter: saturate(180%) blur(20px);
-  backdrop-filter: saturate(180%) blur(20px);
-  border-bottom: 0.5px solid var(--rv-hair);
+  background: var(--rv-glass-chrome);
+  -webkit-backdrop-filter: var(--rv-glass-blur);
+  backdrop-filter: var(--rv-glass-blur);
+  box-shadow: inset 0 -0.5px 0 var(--rv-glass-line), inset 0 1px 0 var(--rv-glass-hi);
   flex: none;
 }
-.rv-app .rv-brand { display: inline-flex; align-items: center; color: var(--rv-tint-text); padding: 4px; flex: none; }
+.rv-app .rv-brand { display: inline-flex; align-items: center; color: var(--rv-ink); padding: 4px; flex: none; }
 .rv-app button.rv-add {
   appearance: none; border: 0; margin: 0; padding: 0;
   width: 28px; height: 28px; border-radius: 50%;
@@ -133,11 +191,11 @@
 .rv-app button.rv-gear {
   appearance: none; border: 0; margin: 0 2px 0 0; padding: 4px;
   width: 32px; height: 32px; border-radius: 50%; flex: none;
-  background: transparent; box-shadow: none; color: var(--rv-tint-text);
+  background: transparent; box-shadow: none; color: var(--rv-ink);
   display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
 }
 .rv-app button.rv-gear:hover { background: var(--rv-fill); }
-.rv-app button.rv-gear .rv-icon svg { width: 20px; height: 20px; }
+.rv-app button.rv-gear .rv-icon svg { width: 20px; height: 20px; stroke-width: 1.75; }
 .rv-app button.rv-add:hover { filter: brightness(1.08); }
 .rv-app button.rv-add:active { transform: scale(0.94); }
 .rv-app button.rv-add:disabled { opacity: 0.3; cursor: default; }
@@ -154,40 +212,53 @@
   display: flex;
   gap: 2px;
   padding: 2px;
-  border-radius: 9px;
+  border-radius: var(--rv-radius-sm);
   background: var(--rv-seg-bg);
   max-width: calc(100% - 120px);
 }
 .rv-app .rv-tabs[hidden] { display: none; }
 .rv-app button.rv-tab {
   appearance: none; border: 0; margin: 0;
-  padding: 5px 12px; border-radius: 7px;
+  padding: 5px 12px; border-radius: calc(var(--rv-radius-sm) - 2px);
   background: transparent; box-shadow: none; color: var(--rv-ink);
   font: inherit; font-size: 13px; font-weight: 500; letter-spacing: -0.01em; line-height: 1.2;
   cursor: pointer; height: auto; white-space: nowrap; flex: 1;
+  display: inline-flex; align-items: center; justify-content: center;
 }
+/* Each tab carries its icon; only the phone tab bar shows it. */
+.rv-app button.rv-tab .rv-icon { display: none; }
 .rv-app button.rv-tab.is-active { background: var(--rv-seg-on); box-shadow: var(--rv-seg-shadow); font-weight: 600; }
-.theme-dark .rv-app button.rv-tab.is-active { color: #fff; }
 
 /* Keyed on the PANE's width (an .is-narrow class the ResizeObserver in
    app.js keeps in sync), not the window's — a narrow sidebar on desktop
-   is exactly as cramped as a phone screen. */
+   is exactly as cramped as a phone screen. Docked glass, every page as an
+   icon over a small label in equal columns, the page you are on a raised
+   glass capsule. Equal columns from the grid itself, so the count of
+   pages is not written here. */
 .rv-app.is-narrow .rv-tabs {
-  top: auto; bottom: 0; left: 0; right: 0; transform: none;
-  max-width: none; border-radius: 0; padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
-  background: var(--rv-toolbar);
-  -webkit-backdrop-filter: saturate(180%) blur(20px);
-  backdrop-filter: saturate(180%) blur(20px);
-  border-top: 0.5px solid var(--rv-hair);
-  gap: 4px;
+  top: auto; bottom: 0; left: 0; right: 0; transform: none; max-width: none;
+  display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 0;
+  padding: 4px 4px calc(4px + env(safe-area-inset-bottom, 0px)); border-radius: 0;
+  background: var(--rv-glass-chrome);
+  -webkit-backdrop-filter: var(--rv-glass-blur);
+  backdrop-filter: var(--rv-glass-blur);
+  box-shadow: inset 0 0.5px 0 var(--rv-glass-line), inset 0 1px 0 var(--rv-glass-hi);
+  overflow: hidden;
 }
-.rv-app.is-narrow button.rv-tab { padding: 8px 6px; font-size: 12.5px; border-radius: 8px; }
-.rv-app.is-narrow button.rv-tab.is-active { background: var(--rv-tint-soft); color: var(--rv-tint-text); box-shadow: none; }
-/* Declared after the narrow rule above (same specificity class-count, higher
-   by one class) so the dark phone tab bar keeps white labels: the accent
-   text colour on its own soft fill is only ~3.9:1 there. */
-.theme-dark .rv-app.is-narrow button.rv-tab.is-active { color: var(--rv-ink); }
-.rv-app.is-narrow .rv-main { padding-bottom: calc(52px + env(safe-area-inset-bottom, 0px)); }
+.rv-app.is-narrow button.rv-tab {
+  flex-direction: column; gap: 3px; min-width: 0; height: 50px; padding: 5px 0 4px;
+  border-radius: var(--rv-radius); font-size: 10px; font-weight: 600; letter-spacing: 0; color: var(--rv-dim);
+}
+.rv-app.is-narrow button.rv-tab .rv-icon { display: inline-flex; width: 22px; height: 22px; }
+.rv-app.is-narrow button.rv-tab .rv-icon svg { width: 22px; height: 22px; stroke-width: 1.75; }
+.rv-app.is-narrow button.rv-tab .rv-btn-label { display: block; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: clip; }
+.rv-app.is-narrow button.rv-tab.is-active {
+  color: var(--rv-ink); background: rgba(255, 255, 255, 0.78);
+  box-shadow: inset 0 1px 0 #ffffff, 0 0 0 0.5px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.10);
+}
+.rv-app.is-narrow button.rv-tab.is-active .rv-icon svg { stroke-width: 2.25; }
+.theme-dark .rv-app.is-narrow button.rv-tab.is-active { background: rgba(255, 255, 255, 0.14); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14); }
+.rv-app.is-narrow .rv-main { padding-bottom: calc(58px + env(safe-area-inset-bottom, 0px)); }
 
 /* ---- main ------------------------------------------------------------ */
 
@@ -221,9 +292,9 @@
 
 /* ---- hero ------------------------------------------------------------ */
 
-.rv-app .rv-hero { display: flex; align-items: flex-start; gap: 16px; padding: 12px 20px 18px; }
+.rv-app .rv-hero { display: flex; align-items: center; gap: 16px; margin: 10px 20px 0; padding: 18px 20px; border-radius: var(--rv-radius); }
 .rv-app .rv-hero-num { font-size: 66px; line-height: 62px; font-weight: 700; letter-spacing: -2.6px; color: var(--rv-ink); font-feature-settings: 'tnum' 1; flex: none; }
-.rv-app .rv-hero-copy { padding-top: 6px; min-width: 0; }
+.rv-app .rv-hero-copy { min-width: 0; }
 .rv-app .rv-hero-line { margin: 0; font-size: 20px; line-height: 25px; font-weight: 600; letter-spacing: -0.4px; color: var(--rv-ink); }
 .rv-app .rv-hero-rest { margin: 2px 0 0; font-size: 15px; line-height: 20px; letter-spacing: -0.2px; color: var(--rv-dim); }
 .rv-app .rv-pill {
@@ -235,7 +306,7 @@
 .rv-app .rv-pill .rv-icon svg { width: 14px; height: 14px; }
 
 /* stillness line */
-.rv-app .rv-still { margin: 4px 20px 6px; padding: 16px 18px; border-radius: 11px; background: var(--rv-cell); }
+.rv-app .rv-still { margin: 4px 20px 6px; padding: 16px 18px; border-radius: var(--rv-radius); }
 .rv-app .rv-still-text { margin: 0; font-size: 17px; line-height: 24px; letter-spacing: -0.4px; color: var(--rv-ink); }
 .rv-app .rv-still-ref { margin: 6px 0 0; font-size: 13px; letter-spacing: 0.02em; color: var(--rv-dim); }
 
@@ -245,7 +316,7 @@
 .rv-app .rv-h2 { margin: 0; font-size: 13px; font-weight: 600; line-height: 18px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--rv-dim); }
 .rv-app .rv-group-aside { font-size: 13px; color: var(--rv-dim); font-feature-settings: 'tnum' 1; }
 
-.rv-app .rv-list { margin: 0 20px; padding: 0; background: var(--rv-cell); border-radius: 11px; overflow: hidden; }
+.rv-app .rv-list { margin: 0 20px; padding: 0; border-radius: var(--rv-radius); overflow: hidden; }
 .rv-app .rv-list + .rv-list { margin-top: 12px; }
 .rv-app .rv-later { margin-top: 12px; }
 
@@ -324,7 +395,7 @@
 /* footer link */
 .rv-app .rv-foot { margin: 22px 20px 8px; text-align: center; }
 .rv-app button.rv-link {
-  appearance: none; border: 0; margin: 0; padding: 10px;
+  appearance: none; border: 0; margin: 0; padding: 10px; min-height: 44px;
   background: transparent; box-shadow: none; color: var(--rv-tint-text);
   font: inherit; font-size: 17px; letter-spacing: -0.41px; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; height: auto;
 }
@@ -392,10 +463,10 @@
 .rv-app.is-xnarrow .rv-wide-only { display: none; }
 
 /* a practice shown inside an open area */
-.rv-app .rv-row-sub { padding-left: 54px; background: var(--rv-cell-2); min-height: 46px; }
+.rv-app .rv-row-sub { padding-left: 54px; background: var(--rv-fill); min-height: 46px; }
 .rv-app .rv-row-sub + .rv-row-sub::before { left: 54px; }
 .rv-app .rv-row-name-sub { font-size: 15px; line-height: 20px; letter-spacing: -0.24px; }
-.rv-app .rv-sub-empty { padding: 10px 16px 10px 54px; font-size: 15px; color: var(--rv-dim); background: var(--rv-cell-2); }
+.rv-app .rv-sub-empty { padding: 10px 16px 10px 54px; font-size: 15px; color: var(--rv-dim); background: var(--rv-fill); }
 .rv-app .rv-row-meta.is-cold { color: var(--rv-warn); }
 .rv-app .rv-row-area.is-open .rv-row-name { font-weight: 600; }
 .rv-app .rv-row-aside .rv-row-name-quiet { font-style: normal; }
@@ -406,7 +477,7 @@
 
 /* ---- setup card ------------------------------------------------------ */
 
-.rv-app .rv-setup { max-width: 520px; margin: 48px auto; padding: 24px; background: var(--rv-cell); border-radius: 14px; }
+.rv-app .rv-setup { max-width: 520px; margin: 48px auto; padding: 24px; border-radius: var(--rv-radius); }
 .rv-app.is-narrow .rv-setup { margin: 40px 20px; }
 .rv-app .rv-setup-title { font-size: 34px; font-weight: 700; letter-spacing: -0.5px; margin: 0 0 10px; }
 .rv-app .rv-setup-lead { font-size: 17px; font-weight: 600; letter-spacing: -0.4px; margin: 0 0 10px; }
@@ -415,7 +486,7 @@
 
 .rv-app button.rv-btn {
   appearance: none; border: 0; margin: 0; padding: 10px 16px;
-  border-radius: 10px; background: var(--rv-fill-2); color: var(--rv-tint-text);
+  border-radius: var(--rv-radius-sm); background: var(--rv-fill-2); color: var(--rv-tint-text);
   box-shadow: none; font: inherit; font-size: 15px; font-weight: 600; letter-spacing: -0.2px; cursor: pointer; height: auto; line-height: 1.2;
 }
 .rv-app button.rv-btn:hover { filter: brightness(0.97); }
@@ -441,32 +512,31 @@
 .theme-dark .rv-app .rv-toast-inner { background: rgba(58, 58, 60, 0.96); }
 .rv-app button.rv-toast-btn {
   appearance: none; border: 0; margin: 0; padding: 4px 6px;
-  background: transparent; box-shadow: none; color: var(--rv-tint-text-d, #67889f);
+  background: transparent; box-shadow: none; color: var(--rv-tint-text-d, #ffffff);
   font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; height: auto;
 }
 
 /* ---- modal ----------------------------------------------------------- */
 
-.rv-modal { border-radius: 14px; }
+.rv-modal { border-radius: var(--rv-radius, 14px); }
 .rv-app.rv-modal-body { display: block; height: auto; overflow: visible; background: transparent; padding: 2px 2px 0; }
 .rv-app .rv-modal-title { font-size: 22px; font-weight: 700; letter-spacing: -0.4px; margin: 0 0 12px; }
 .rv-app .rv-modal-hint { font-size: 13px; line-height: 18px; color: var(--rv-dim); margin: 8px 2px 14px; }
 .rv-app .rv-quick-hint { margin-top: 6px; }
-.rv-app .rv-seg { display: flex; gap: 2px; padding: 2px; border-radius: 9px; background: var(--rv-seg-bg); }
+.rv-app .rv-seg { display: flex; gap: 2px; padding: 2px; border-radius: var(--rv-radius-sm); background: var(--rv-seg-bg); }
 .rv-app button.rv-seg-btn {
   appearance: none; border: 0; margin: 0; padding: 6px 4px; flex: 1;
   border-radius: 7px; background: transparent; box-shadow: none; color: var(--rv-ink);
   font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; height: auto; line-height: 1.2;
 }
 .rv-app button.rv-seg-btn.is-active { background: var(--rv-seg-on); box-shadow: var(--rv-seg-shadow); font-weight: 600; }
-.theme-dark .rv-app button.rv-seg-btn.is-active { color: #fff; }
 .rv-app button.rv-seg-btn:disabled { opacity: 0.35; cursor: default; }
 .rv-app .rv-form { display: flex; flex-direction: column; gap: 12px; }
 .rv-app .rv-field { display: flex; flex-direction: column; gap: 5px; }
 .rv-app .rv-field-label { font-size: 13px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--rv-dim); }
 .rv-app .rv-input {
   width: 100%; font: inherit; font-size: 17px; letter-spacing: -0.41px; padding: 10px 12px;
-  border: 0; border-radius: 10px; background: var(--rv-fill); color: var(--rv-ink);
+  border: 0; border-radius: var(--rv-radius-sm); background: var(--rv-fill); color: var(--rv-ink);
   box-shadow: none; height: auto; appearance: none; -webkit-appearance: none;
 }
 .rv-app .rv-input:hover { background: var(--rv-fill); border: 0; }
@@ -478,14 +548,13 @@
 
 /* the writing box */
 .rv-app .rv-note-field { margin-top: 12px; }
-.rv-app .rv-md-bar { display: flex; gap: 2px; padding: 2px; border-radius: 9px; background: var(--rv-seg-bg); margin-bottom: 6px; }
+.rv-app .rv-md-bar { display: flex; gap: 2px; padding: 2px; border-radius: var(--rv-radius-sm); background: var(--rv-seg-bg); margin-bottom: 6px; }
 .rv-app button.rv-md-btn {
   appearance: none; border: 0; margin: 0; padding: 0; flex: 1;
   height: 30px; border-radius: 7px; background: transparent; box-shadow: none; color: var(--rv-ink);
   display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
 }
 .rv-app button.rv-md-btn:hover { background: var(--rv-seg-on); box-shadow: var(--rv-seg-shadow); }
-.theme-dark .rv-app button.rv-md-btn:hover { color: #fff; }
 .rv-app button.rv-md-btn .rv-icon svg { width: 16px; height: 16px; }
 .rv-app textarea.rv-note-body { min-height: 170px; resize: vertical; font-size: 16px; line-height: 22px; letter-spacing: -0.2px; }
 
@@ -493,41 +562,70 @@
 
 .rv-app button.rv-row-disclosure .rv-row-name { color: var(--rv-ink); }
 
-/* ---- wallpaper and glass --------------------------------------------- */
+/* ---- glass ----------------------------------------------------------- */
 
-/* Only in `has-bg`. With no wallpaper the app stays on its flat grouped
-   ground, which is the cheaper and calmer default; glass is what a
-   photograph behind the content makes necessary, not a decoration applied
-   for its own sake. */
-.rv-app {
-  --rv-glass: rgba(255, 255, 255, 0.64);
-  --rv-glass-2: rgba(255, 255, 255, 0.44);
-  --rv-glass-3: rgba(255, 255, 255, 0.9); /* columns: text sits on them directly */
-  --rv-glass-edge: rgba(255, 255, 255, 0.55);
-  --rv-glass-blur: saturate(180%) blur(20px);
-  --rv-bg-dim: 0.55;
+/* One recipe for every pane: the translucent fill, the desaturating blur,
+   a lit edge, a highlight along the top and a soft neutral shadow. The
+   toolbar and the phone tab bar use the chrome fill (above); cards that
+   sit ON a pane (.rv-card) are a brighter film with no blur of their own —
+   forty blurred cards on a phone is forty compositing layers. */
+.rv-app .rv-list,
+.rv-app .rv-hero,
+.rv-app .rv-still,
+.rv-app .rv-setup,
+.rv-app .rv-week,
+.rv-app .rv-col {
+  background: var(--rv-glass);
+  -webkit-backdrop-filter: var(--rv-glass-blur);
+  backdrop-filter: var(--rv-glass-blur);
+  box-shadow: inset 0 1px 0 var(--rv-glass-hi), inset 0 0 0 1px var(--rv-glass-edge), 0 0 0 0.5px var(--rv-glass-line), var(--rv-glass-shadow);
 }
-.theme-dark .rv-app {
-  --rv-glass: rgba(28, 28, 30, 0.62);
-  --rv-glass-2: rgba(28, 28, 30, 0.4);
-  --rv-glass-3: rgba(28, 28, 30, 0.86);
-  --rv-glass-edge: rgba(255, 255, 255, 0.12);
-}
+
+/* ---- wallpaper ------------------------------------------------------- */
+
+/* A photograph behind everything (`has-bg`). The panes are glass already;
+   over a picture they get thicker, because a photo has darker and brighter
+   patches than the grey ground and the text on the glass must hold on
+   both. The blur still desaturates, so the picture reads grey behind the
+   panes and the page stays black and white. */
+.rv-app { --rv-bg-dim: 0.55; --rv-chip-glass: rgba(255, 255, 255, 0.74); }
+.theme-dark .rv-app { --rv-chip-glass: rgba(20, 20, 22, 0.72); }
 
 .rv-app.has-bg {
   background-image: var(--rv-bg-image);
   background-size: cover;
   background-position: center center;
   background-repeat: no-repeat;
+  --rv-glass: rgba(255, 255, 255, 0.76);
+  --rv-glass-2: rgba(255, 255, 255, 0.6);
+  --rv-glass-chrome: rgba(255, 255, 255, 0.78);
+  --rv-card: rgba(255, 255, 255, 0.8);
+  /* Those greys are tuned for the plain ground; over a picture they need
+     more weight, and the red goes one step deeper. */
+  --rv-dim: rgba(40, 40, 46, 0.88);
+  --rv-faint: rgba(40, 40, 46, 0.6);
+  --rv-ring: rgba(40, 40, 46, 0.66);
+  --rv-warn: #c4001a;
 }
-/* The veil. Everything above it is content, so its z-index is the floor. */
+.theme-dark .rv-app.has-bg {
+  --rv-glass: rgba(28, 28, 31, 0.76);
+  --rv-glass-2: rgba(28, 28, 31, 0.6);
+  --rv-glass-chrome: rgba(24, 24, 27, 0.78);
+  --rv-card: rgba(255, 255, 255, 0.1);
+  --rv-dim: rgba(245, 245, 250, 0.84);
+  --rv-faint: rgba(245, 245, 250, 0.52);
+  --rv-ring: rgba(245, 245, 250, 0.6);
+  --rv-warn: #ff7b73;
+}
+/* The veil, neutral only. Everything above it is content, so its z-index
+   is the floor. */
 .rv-app.has-bg::before {
   content: '';
   position: absolute;
   top: 0; right: 0; bottom: 0; left: 0;
   z-index: 0;
   pointer-events: none;
-  background: rgba(242, 242, 247, var(--rv-bg-dim));
+  background: rgba(242, 242, 245, var(--rv-bg-dim));
 }
 .theme-dark .rv-app.has-bg::before { background: rgba(0, 0, 0, var(--rv-bg-dim)); }
 /* Matched to the host override's specificity so the picture actually wins. */
@@ -538,56 +636,27 @@
   background-position: center center;
   background-repeat: no-repeat;
 }
+.rv-app.has-bg .rv-col.is-today { background: linear-gradient(var(--rv-tint-band), var(--rv-tint-band)), var(--rv-glass); }
+.rv-app.has-bg .rv-card-event { background: transparent; box-shadow: none; }
 
-.rv-app.has-bg .rv-list,
-.rv-app.has-bg .rv-still,
-.rv-app.has-bg .rv-setup,
-.rv-app.has-bg .rv-deck-card,
-.rv-app.has-bg .rv-card,
-.rv-app.has-bg .rv-week {
-  background: var(--rv-glass);
-  -webkit-backdrop-filter: var(--rv-glass-blur);
-  backdrop-filter: var(--rv-glass-blur);
-  box-shadow: inset 0 0 0 0.5px var(--rv-glass-edge), 0 1px 12px rgba(0, 0, 0, 0.08);
-}
-.rv-app.has-bg .rv-col { background: var(--rv-glass-3); -webkit-backdrop-filter: var(--rv-glass-blur); backdrop-filter: var(--rv-glass-blur); }
-/* The tint goes OVER the glass, never instead of it: replacing the glass
-   left the today column's text sitting straight on the photograph. */
-.rv-app.has-bg .rv-col.is-today { background: linear-gradient(var(--rv-tint-band), var(--rv-tint-band)), var(--rv-glass-3); }
-.rv-app.has-bg .rv-col.is-over { background: linear-gradient(var(--rv-tint-soft), var(--rv-tint-soft)), var(--rv-glass-3); }
-.rv-app.has-bg .rv-row-sub, .rv-app.has-bg .rv-sub-empty { background: var(--rv-glass-2); }
-.rv-app.has-bg .rv-card-event { background: transparent; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
-
-/* The hero is bare type in the flat design. Over a photograph it needs a
-   surface of its own, or the largest text on the page is the least
-   readable thing on it. */
-.rv-app.has-bg .rv-hero {
-  margin: 8px 20px 0;
-  padding: 18px 20px;
-  border-radius: 14px;
-  background: var(--rv-glass);
-  -webkit-backdrop-filter: var(--rv-glass-blur);
-  backdrop-filter: var(--rv-glass-blur);
-  box-shadow: inset 0 0 0 0.5px var(--rv-glass-edge), 0 1px 12px rgba(0, 0, 0, 0.08);
-}
-
-/* Labels and paragraphs that sit ON the picture get a surface of their
-   own. A halo alone cannot save dark text over dark foliage at a low
-   veil, and the veil is the user's to set — so the type must hold at any
-   setting rather than only at the sensible ones. */
-.rv-app.has-bg .rv-h2 {
+/* Labels and paragraphs that sit ON the picture get a glass chip of their
+   own. A halo alone cannot save dark text over dark foliage at a low veil,
+   and the veil is the user's to set — so the type must hold at any setting
+   rather than only at the sensible ones. */
+.rv-app.has-bg .rv-h2,
+.rv-app.has-bg .rv-eyebrow {
   display: inline-block;
-  padding: 3px 9px;
-  margin-left: -9px;
+  padding: 2px 8px;
+  margin-left: -8px;
   border-radius: 7px;
-  background: var(--rv-glass);
-  -webkit-backdrop-filter: var(--rv-glass-blur);
-  backdrop-filter: var(--rv-glass-blur);
+  background: var(--rv-chip-glass);
+  -webkit-backdrop-filter: saturate(120%) blur(16px);
+  backdrop-filter: saturate(120%) blur(16px);
 }
 .rv-app.has-bg .rv-lead,
 .rv-app.has-bg .rv-empty {
   padding: 10px 14px;
-  border-radius: 12px;
+  border-radius: var(--rv-radius);
   background: var(--rv-glass-2);
   -webkit-backdrop-filter: var(--rv-glass-blur);
   backdrop-filter: var(--rv-glass-blur);
@@ -600,7 +669,7 @@
    wallpaper, so the accent TEXT keeps its 4.5:1. */
 .rv-app.has-bg button.rv-link {
   padding: 10px 16px;
-  border-radius: 12px;
+  border-radius: var(--rv-radius-sm);
   background: var(--rv-cell);
   box-shadow: inset 0 0 0 0.5px var(--rv-glass-edge), 0 1px 12px rgba(0, 0, 0, 0.08);
 }
@@ -639,23 +708,20 @@
 .theme-dark .rv-app.has-bg .rv-wk-date {
   text-shadow: 0 0 4px rgba(0, 0, 0, 0.95), 0 0 9px rgba(0, 0, 0, 0.85), 0 1px 2px rgba(0, 0, 0, 0.9);
 }
-/* Those greys are tuned for a flat cell; on glass they need more weight. */
-.rv-app.has-bg { --rv-dim: rgba(50, 50, 58, 0.86); --rv-faint: rgba(50, 50, 58, 0.6); }
-.theme-dark .rv-app.has-bg { --rv-dim: rgba(240, 240, 250, 0.82); --rv-faint: rgba(240, 240, 250, 0.52); }
 
-/* Without backdrop-filter the panels would be flat washes over a sharp
-   photograph, which is the one combination that cannot be read. Go nearly
-   opaque instead — the wallpaper survives at the margins. */
+/* Without backdrop-filter the panes would be flat washes over the ground
+   or a sharp photograph, which is the one combination that cannot be read.
+   Go nearly opaque instead — the ground survives at the margins. */
 @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
-  .rv-app.has-bg { --rv-glass: rgba(255, 255, 255, 0.93); --rv-glass-2: rgba(255, 255, 255, 0.85); --rv-glass-3: rgba(255, 255, 255, 0.95); }
-  .theme-dark .rv-app.has-bg { --rv-glass: rgba(28, 28, 30, 0.93); --rv-glass-2: rgba(28, 28, 30, 0.85); --rv-glass-3: rgba(28, 28, 30, 0.95); }
+  .rv-app, .rv-app.has-bg { --rv-glass: rgba(255, 255, 255, 0.93); --rv-glass-2: rgba(255, 255, 255, 0.85); --rv-glass-chrome: rgba(248, 248, 249, 0.96); --rv-chip-glass: rgba(255, 255, 255, 0.93); }
+  .theme-dark .rv-app, .theme-dark .rv-app.has-bg { --rv-glass: rgba(36, 36, 40, 0.94); --rv-glass-2: rgba(36, 36, 40, 0.85); --rv-glass-chrome: rgba(24, 24, 27, 0.96); --rv-chip-glass: rgba(24, 24, 27, 0.93); }
 }
 
 /* ---- the deck: one card at a time ------------------------------------ */
 
 .rv-app .rv-viewseg {
   display: flex; gap: 2px; margin: 8px 20px 4px; padding: 2px;
-  border-radius: 9px; background: var(--rv-seg-bg); align-self: flex-start; width: fit-content;
+  border-radius: var(--rv-radius-sm); background: var(--rv-seg-bg); align-self: flex-start; width: fit-content;
 }
 .rv-app button.rv-viewseg-btn {
   appearance: none; border: 0; margin: 0; padding: 5px 12px;
@@ -664,7 +730,6 @@
   display: inline-flex; align-items: center; gap: 6px; cursor: pointer; height: auto; line-height: 1.2;
 }
 .rv-app button.rv-viewseg-btn.is-active { background: var(--rv-seg-on); box-shadow: var(--rv-seg-shadow); font-weight: 600; }
-.theme-dark .rv-app button.rv-viewseg-btn.is-active { color: #fff; }
 .rv-app button.rv-viewseg-btn .rv-icon svg { width: 15px; height: 15px; }
 
 .rv-app .rv-deck-wrap { margin: 10px 20px 0; }
@@ -674,7 +739,7 @@
 .rv-app .rv-deck { position: relative; min-height: 240px; }
 .rv-app .rv-deck-card {
   position: absolute; top: 0; left: 0; right: 0;
-  background: var(--rv-cell); border-radius: 14px; padding: 20px 20px 16px;
+  background: var(--rv-cell); border-radius: var(--rv-radius); padding: 20px 20px 16px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 8px 28px rgba(0, 0, 0, 0.07);
   transform-origin: 50% 100%;
   transition: transform 0.33s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.33s ease, box-shadow 0.2s;
@@ -700,7 +765,7 @@
 .rv-app .rv-deck-actions { display: flex; gap: 8px; margin-top: 20px; }
 .rv-app button.rv-deck-btn {
   appearance: none; border: 0; margin: 0; padding: 10px 12px; flex: 1;
-  border-radius: 10px; background: var(--rv-fill-2); color: var(--rv-ink); box-shadow: none;
+  border-radius: var(--rv-radius-sm); background: var(--rv-fill-2); color: var(--rv-ink); box-shadow: none;
   font: inherit; font-size: 14px; font-weight: 600; letter-spacing: -0.2px;
   display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; height: auto; line-height: 1.2;
 }
@@ -717,7 +782,7 @@
 .rv-app .rv-shelf-track { display: flex; gap: 10px; overflow-x: auto; padding: 2px 0 10px; -webkit-overflow-scrolling: touch; }
 .rv-app .rv-shelf-track .rv-card { flex: none; width: 190px; }
 .rv-app .rv-shelf-empty { margin: 0 0 10px; font-size: 15px; color: var(--rv-dim); }
-.rv-app .rv-shelf.is-over { outline: 2px dashed var(--rv-tint); outline-offset: 4px; border-radius: 12px; }
+.rv-app .rv-shelf.is-over { outline: 2px dashed var(--rv-tint); outline-offset: 4px; border-radius: var(--rv-radius); }
 
 .rv-app .rv-board {
   display: flex; gap: 10px; overflow-x: auto; padding: 2px 20px 12px;
@@ -726,12 +791,14 @@
 .rv-app .rv-col {
   flex: none; width: 168px; scroll-snap-align: start;
   display: flex; flex-direction: column;
-  background: var(--rv-fill); border-radius: 12px; padding: 8px;
+  border-radius: var(--rv-radius); padding: 8px;
   transition: background 0.15s, outline-color 0.15s;
   outline: 2px dashed transparent; outline-offset: -2px;
 }
-.rv-app .rv-col.is-over { background: var(--rv-tint-soft); outline-color: var(--rv-tint-text); }
-.rv-app .rv-col.is-today { background: var(--rv-tint-band); }
+/* The tint goes OVER the glass, never instead of it, so the day's text
+   never sits straight on the ground (or a photograph). */
+.rv-app .rv-col.is-over { background: linear-gradient(var(--rv-tint-soft), var(--rv-tint-soft)), var(--rv-glass); outline-color: var(--rv-tint-text); }
+.rv-app .rv-col.is-today { background: linear-gradient(var(--rv-tint-band), var(--rv-tint-band)), var(--rv-glass); }
 .rv-app .rv-col-head { display: flex; align-items: baseline; gap: 6px; padding: 2px 4px 8px; }
 .rv-app .rv-col-dow { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--rv-dim); }
 .rv-app .rv-col.is-today .rv-col-dow { color: var(--rv-tint-text); }
@@ -744,11 +811,11 @@
 
 .rv-app .rv-card {
   display: flex; align-items: flex-start; gap: 6px;
-  background: var(--rv-cell); border-radius: 10px; padding: 9px 10px 9px 4px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.07);
+  background: var(--rv-card); border-radius: var(--rv-radius-sm); padding: 9px 10px 9px 4px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 1px 2px rgba(0, 0, 0, 0.05);
   transition: opacity 0.15s, transform 0.15s;
 }
-.theme-dark .rv-app .rv-card { box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5); }
+.theme-dark .rv-app .rv-card { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06); }
 .rv-app .rv-card.is-dragging { opacity: 0.3; }
 .rv-app .rv-card.is-done { opacity: 0.5; }
 .rv-app .rv-card-grip { flex: none; color: var(--rv-faint); padding: 2px 0; cursor: grab; touch-action: none; }
@@ -768,7 +835,7 @@
   position: fixed; z-index: 100; margin: 0; pointer-events: none;
   display: flex; align-items: flex-start; gap: 6px;
   background: var(--rv-cell, #fff); color: var(--rv-ink, #000);
-  border-radius: 10px; padding: 9px 10px 9px 4px;
+  border-radius: var(--rv-radius-sm, 9px); padding: 9px 10px 9px 4px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22);
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;
   opacity: 0.96;
@@ -778,30 +845,60 @@
 
 /* ---- soft entrance --------------------------------------------------- */
 
+/* Redpeak's welcome, in black and white: the sun (or the moon, after
+   seven) in a glass disc that breathes inside a soft neutral halo, two
+   rings rolling out from the disc half a beat apart, and the greeting
+   rising in under it. Then the splash fades and the page's blocks rise in
+   one after another. */
 .rv-app .rv-splash {
   position: absolute; z-index: 20; top: 0; right: 0; bottom: 0; left: 0;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
-  background: var(--rv-bg); color: var(--rv-ink);
+  background-color: var(--rv-bg); background-image: var(--rv-ground); background-size: 100% 100%;
+  color: var(--rv-ink);
   transition: opacity 0.7s ease;
 }
 .rv-app .rv-splash.is-leaving { opacity: 0; pointer-events: none; }
-.rv-app .rv-splash-sun { color: var(--rv-tint-text); margin-bottom: 14px; animation: rv-breathe 2.6s ease-in-out infinite; }
-.rv-app .rv-splash-sun .rv-icon, .rv-app .rv-splash-sun .rv-icon svg { width: 44px; height: 44px; }
-.rv-app .rv-splash-sun .rv-icon svg { stroke-width: 1.5; }
-.rv-app .rv-splash-hello { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; animation: rv-rise 0.7s 0.15s ease-out both; }
-.rv-app .rv-splash-date { font-size: 13px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--rv-dim); animation: rv-rise 0.7s 0.3s ease-out both; }
-
-.rv-app .rv-page.rv-enter > * {
-  animation: rv-slide 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
-  animation-delay: min(calc(var(--rv-i, 0) * 90ms), 900ms);
+.rv-app .rv-splash-mark { position: relative; width: 150px; height: 150px; margin-bottom: 12px; }
+.rv-app .rv-splash-mark > span { position: absolute; left: 50%; top: 50%; border-radius: 50%; transform: translate(-50%, -50%); }
+.rv-app .rv-splash-glow {
+  width: 150px; height: 150px;
+  background: radial-gradient(closest-side, var(--rv-halo-1), var(--rv-halo-2) 40%, rgba(128, 128, 128, 0) 100%);
+  animation: rv-breathe-c 3.2s ease-in-out infinite;
 }
-.rv-app .rv-page.rv-enter > .rv-titlebar { animation: rv-rise 0.6s ease-out both; }
-.rv-app .rv-page.rv-enter > .rv-hero { animation: rv-slide 0.9s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.rv-app .rv-splash-ring {
+  width: 64px; height: 64px; border: 1.5px solid var(--rv-splash-ring); filter: blur(0.6px); opacity: 0;
+  animation: rv-ring-c 2.6s ease-out infinite;
+}
+.rv-app .rv-splash-ring.is-late { animation-delay: 1.3s; }
+.rv-app .rv-splash-core {
+  width: 64px; height: 64px; color: var(--rv-ink);
+  display: flex; align-items: center; justify-content: center;
+  background: var(--rv-glass);
+  -webkit-backdrop-filter: var(--rv-glass-blur);
+  backdrop-filter: var(--rv-glass-blur);
+  box-shadow: inset 0 1px 0 var(--rv-glass-hi), inset 0 0 0 1px var(--rv-glass-edge), 0 0 0 0.5px var(--rv-glass-line), 0 10px 30px rgba(0, 0, 0, 0.10);
+  animation: rv-breathe-c 3.2s ease-in-out infinite;
+}
+.rv-app .rv-splash-core .rv-icon, .rv-app .rv-splash-core .rv-icon svg { width: 30px; height: 30px; }
+.rv-app .rv-splash-core .rv-icon svg { stroke-width: 1.5; }
+.rv-app .rv-splash-hello { font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: -0.5px; animation: rv-rise 900ms var(--rv-ease) 0.15s both; }
+.rv-app .rv-splash-date { font-size: 13px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--rv-dim); animation: rv-rise 900ms var(--rv-ease) 0.3s both; }
 
-@keyframes rv-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-@keyframes rv-slide { from { opacity: 0; transform: translateY(36px); } to { opacity: 1; transform: none; } }
+/* The page's blocks rise in, 50ms apart. While the splash is still up the
+   page waits (is-waiting holds the animations at their first frame), so
+   the rise is seen as the splash lifts rather than spent behind it. */
+.rv-app .rv-page.rv-enter > * {
+  animation: rv-rise 640ms var(--rv-ease) both;
+  animation-delay: min(calc(var(--rv-i, 0) * 50ms), 600ms);
+}
+.rv-app .rv-page.rv-enter > .rv-titlebar { animation: rv-rise 900ms var(--rv-ease) both; }
+.rv-app .rv-page.rv-enter.is-waiting > *,
+.rv-app .rv-embed.rv-embed-enter.is-waiting { animation-play-state: paused; }
+
+@keyframes rv-rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
 @keyframes rv-fade-in { from { opacity: 0; } to { opacity: 1; } }
-@keyframes rv-breathe { 0%, 100% { transform: scale(1); opacity: 0.85; } 50% { transform: scale(1.08); opacity: 1; } }
+@keyframes rv-breathe-c { 0%, 100% { opacity: 0.75; transform: translate(-50%, -50%) scale(0.92); } 50% { opacity: 1; transform: translate(-50%, -50%) scale(1.08); } }
+@keyframes rv-ring-c { 0% { opacity: 0.9; transform: translate(-50%, -50%) scale(1); } 100% { opacity: 0; transform: translate(-50%, -50%) scale(2.6); } }
 
 /* ---- the accent picker (outside .rv-app) ----------------------------- */
 /* Obsidian's settings tab is not inside the plugin root, so these two are
@@ -873,7 +970,7 @@
 .rv-app button.rv-add::after { top: -8px; right: -8px; bottom: -8px; left: -8px; }       /* 28 -> 44 */
 .rv-app button.rv-nav::after,
 .rv-app button.rv-gear::after { top: -6px; right: -6px; bottom: -6px; left: -6px; }      /* 32 -> 44 */
-.rv-app.is-narrow button.rv-tab::after { top: -7px; right: 0; bottom: -7px; left: 0; }   /* ~31 tall -> 45 */
+.rv-app.is-narrow button.rv-tab::after { top: 0; right: 0; bottom: 0; left: 0; }          /* already 50 tall */
 /* On a phone-narrow pane the List / One-at-a-time switch (28 tall) and the
    Week page's day dots (26 x 22) get the same treatment: a taller hit area
    that stays inside their row, so a thumb lands on them. */
@@ -886,4 +983,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .rv-app * { transition: none !important; animation: none !important; }
+  /* The splash shows still and only fades; no rings. */
+  .rv-app .rv-splash { transition: opacity 0.7s ease !important; }
+  .rv-app .rv-splash-ring { display: none; }
 }

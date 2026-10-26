@@ -37,22 +37,109 @@
   font-family: var(--rv-font);
 }
 /* The roots: each board was a whole view and sized itself to the leaf. */
-.rv-app .rv-embed.nd-app { height: auto; overflow: hidden; background: var(--nd-ground); }
+.rv-app .rv-embed.nd-app { height: auto; overflow: hidden; }
 .rv-app .rv-embed.fortnight { overflow-y: auto; -webkit-overflow-scrolling: touch; }
 .rv-app .rv-embed.fortnight.fn-locked { overflow: hidden; }
 
-/* With a wallpaper only the two ROOTS go clear, so the wallpaper shows
-   behind the board. --background-primary itself stays a solid colour: both
-   boards also use it as TEXT on a filled control (Nudge's selected filter
-   chip, Fortnight's Finish button) and as the ground of their overlays
+/* Only the two ROOTS go clear, so Rhythm's own ground (or its wallpaper)
+   shows behind the board and the board's glass has something to frost.
+   --background-primary itself stays a solid colour: both boards also use
+   it as TEXT on a filled control (Nudge's selected filter chip,
+   Fortnight's Finish button) and as the ground of their overlays
    (Fortnight's welcome, tap sheet, review, sticky week header) — made
    transparent, the chip's label vanished on its white pill and the
    overlays let the board show through. tests/embed-css.test.cjs holds this. */
-.rv-app.has-bg .rv-embed.nd-app { background: transparent; }
-.rv-app.has-bg .rv-embed.fortnight { background-image: none; background-color: transparent; }
+.rv-app .rv-embed.nd-app { background: transparent; }
+.rv-app .rv-embed.fortnight { background-image: none; background-color: transparent; }
+
+/* ---- Frost on the boards ------------------------------------------------ */
+
+/* The Reminders board is glass already; in Rhythm it takes Rhythm's glass:
+   the same fill, lit edge and top highlight, 14px corners, the overdue red,
+   and a blur that greys what is behind it instead of saturating it. On a
+   phone the board drops per-row blur itself (one blurred layer per screen),
+   so the blur is only re-spelled off the phone. */
+.rv-app .rv-embed.nd-app.is-plain {
+  --nd-glass: var(--rv-glass);
+  --nd-glass-2: var(--rv-card);
+  --nd-line: var(--rv-glass-edge);
+  --nd-line-2: var(--rv-glass-edge);
+  --nd-shine: var(--rv-glass-hi);
+  --nd-shadow: var(--rv-glass-shadow);
+  --nd-radius: var(--rv-radius);
+  --nd-radius-s: var(--rv-radius);
+  --nd-late: var(--rv-warn);
+}
+body:not(.is-mobile) .rv-app .rv-embed.nd-app .nd-glass,
+body:not(.is-mobile) .rv-app .rv-embed.nd-app .nd-page .nd-row,
+body:not(.is-mobile) .rv-app .rv-embed.nd-app .nd-page .nd-chip,
+body:not(.is-mobile) .rv-app .rv-embed.nd-app .nd-page .nd-tag,
+body:not(.is-mobile) .rv-app .rv-embed.nd-app .nd-side {
+  -webkit-backdrop-filter: var(--rv-glass-blur);
+  backdrop-filter: var(--rv-glass-blur);
+}
+
+/* Fortnight: every day becomes a glass pane with Redpeak's corners, in
+   place of the hairline-ruled columns, and its washes go grey — the board's
+   own accent-and-orange glow has no place in a black-and-white page. The
+   slipped colour is Rhythm's overdue red. */
+.rv-app .rv-embed.fortnight { --fn-hsl: 0, 0%, 0%; --fn-orgb: 142, 142, 147; --fn-slip: var(--rv-warn); }
+.theme-dark .rv-app .rv-embed.fortnight { --fn-hsl: 0, 0%, 100%; }
+.rv-app .rv-embed.fortnight .fn-board { border-top: 0; gap: 10px; padding: 4px 20px 32px; }
+.rv-app .rv-embed.fortnight .fn-col,
+.rv-app .rv-embed.fortnight .fn-col.is-lead {
+  border-right: 0;
+  border-radius: var(--rv-radius);
+  padding: 0 16px 20px;
+  background: var(--rv-glass);
+  -webkit-backdrop-filter: var(--rv-glass-blur);
+  backdrop-filter: var(--rv-glass-blur);
+  box-shadow: inset 0 1px 0 var(--rv-glass-hi), inset 0 0 0 1px var(--rv-glass-edge), 0 0 0 0.5px var(--rv-glass-line), var(--rv-glass-shadow);
+}
+/* Today, pinned while the fortnight scrolls under it: a brighter pane, so
+   what passes beneath reads as blurred shapes, never as text. */
+.rv-app .rv-embed.fortnight .fn-col.is-today { padding: 0 24px 20px 24px; background-color: rgba(255, 255, 255, 0.74); background-image: none; }
+.theme-dark .rv-app .rv-embed.fortnight .fn-col.is-today { background-color: rgba(70, 70, 76, 0.62); }
+.rv-app.has-bg .rv-embed.fortnight .fn-col.is-today { background-color: rgba(255, 255, 255, 0.86); }
+.theme-dark .rv-app.has-bg .rv-embed.fortnight .fn-col.is-today { background-color: rgba(48, 48, 52, 0.86); }
+.rv-app .rv-embed.fortnight .fn-col.is-past { padding: 74px 0 0; }
+.rv-app .rv-embed.fortnight .fn-col.is-drop {
+  background-image: linear-gradient(rgba(118, 118, 128, 0.14), rgba(118, 118, 128, 0.14));
+  box-shadow: inset 0 0 0 2px var(--rv-ink);
+}
+/* Phone: the day strip is a glass track, the chosen day a raised chip; the
+   day below it one pane. */
+.rv-app .rv-embed.fortnight .fn-switch {
+  margin: 0 16px; padding: 4px; gap: 2px;
+  border: 0; border-radius: var(--rv-radius);
+  background: var(--rv-glass);
+  -webkit-backdrop-filter: var(--rv-glass-blur);
+  backdrop-filter: var(--rv-glass-blur);
+  box-shadow: inset 0 1px 0 var(--rv-glass-hi), inset 0 0 0 1px var(--rv-glass-edge), 0 0 0 0.5px var(--rv-glass-line), var(--rv-glass-shadow);
+}
+.rv-app .rv-embed.fortnight button.fn-sw { height: 56px; border-radius: 10px; }
+.rv-app .rv-embed.fortnight button.fn-sw.is-on { background: var(--rv-seg-on); box-shadow: var(--rv-seg-shadow); }
+.rv-app .rv-embed.fortnight button.fn-sw.is-on .fn-swn { color: var(--rv-ink); font-weight: 600; }
+.rv-app .rv-embed.fortnight button.fn-sw.is-on::after { display: none; }
+.rv-app .rv-embed.fortnight .fn-pbody { padding-top: 10px; }
+.rv-app .rv-embed.fortnight .fn-pbody .fn-col,
+.rv-app .rv-embed.fortnight .fn-pbody .fn-col.is-today { margin: 0 16px; padding: 0 16px 20px; }
+.rv-app .rv-embed.fortnight .fn-pbody .fn-col + .fn-col { margin-top: 10px; }
+.rv-app .rv-embed.fortnight .fn-pbody .fn-col.is-nextweek { border-top: 0; }
+/* The sheet and the review: Redpeak's corners. */
+.rv-app .rv-embed.fortnight .fn-sheet { border-radius: var(--rv-radius) var(--rv-radius) 0 0; }
+
+/* Phone tap targets inside the Reminders board: 44px. The title keeps its
+   place in the row (padding and margin cancel) but takes taps from 12px
+   above and below it; the meta line after it paints over that reach, so
+   its own buttons still get theirs. */
+.rv-app.is-narrow .rv-embed .nd-search { height: 46px; }   /* 44 inside its 1px border */
+.rv-app.is-narrow .rv-embed .nd-search input[type="text"].nd-search-input { align-self: stretch; height: auto; }
+.rv-app.is-narrow .rv-embed .nd-add input[type="text"].nd-add-input { min-height: 44px; }
+.rv-app.is-narrow .rv-embed .nd-page button.nd-row-title { padding: 12px 0; margin: -12px 0; }
 
 /* The soft entrance, as Rhythm's own pages have it. */
-.rv-app .rv-embed.rv-embed-enter { animation: rv-slide 0.8s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.rv-app .rv-embed.rv-embed-enter { animation: rv-rise 640ms var(--rv-ease) both; }
 
 /* Seven pages: the segmented control (and the phone's bottom tab bar)
    scrolls sideways rather than squeezing labels. */

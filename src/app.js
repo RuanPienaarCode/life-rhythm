@@ -28,16 +28,16 @@ const { mountEmbed, EMBEDS } = require('./embed');
    mounted as pages — see embed.js. */
 const TABS = [
   /* Everything due today, from every module (page-now.js). */
-  { id: 'today', label: 'Today' },
-  { id: 'reminders', label: 'Reminders' },
+  { id: 'today', label: 'Today', icon: 'sun' },
+  { id: 'reminders', label: 'Reminders', icon: 'bell' },
   /* The practices page (page-today.js) — "Today" until 0.2.0. Its Week
      view is the old Week page (page-week.js). */
-  { id: 'habits', label: 'Habits' },
-  { id: 'fortnight', label: 'Fortnight' },
-  { id: 'month', label: 'Month' },
-  { id: 'plan', label: 'Plan' },
+  { id: 'habits', label: 'Habits', icon: 'repeat' },
+  { id: 'fortnight', label: 'Fortnight', icon: 'columns-3' },
+  { id: 'month', label: 'Month', icon: 'calendar' },
+  { id: 'plan', label: 'Plan', icon: 'target' },
   /* The areas, in priority order (page-areas.js) — "Areas" until 26 Oct 2026. */
-  { id: 'priorities', label: 'Priorities' },
+  { id: 'priorities', label: 'Priorities', icon: 'list-ordered' },
 ];
 /* Pages that were renamed or folded in: an old deep link, a saved view or
    a bookmark still lands on the page that took its place. */
@@ -419,7 +419,8 @@ function mountApp(view) {
     const scrolled = nav.scrollLeft;
     clear(nav);
     for (const t of TABS) {
-      const b = button(nav, 'rv-tab' + (state.tab === t.id ? ' is-active' : ''), t.label, () => ctx.setTab(t.id));
+      /* The icon shows only in the phone tab bar (styles.css). */
+      const b = button(nav, 'rv-tab' + (state.tab === t.id ? ' is-active' : ''), t.label, () => ctx.setTab(t.id), t.icon);
       b.setAttribute('aria-selected', state.tab === t.id ? 'true' : 'false');
       b.setAttribute('role', 'tab');
     }
@@ -474,7 +475,7 @@ function mountApp(view) {
     clear(main);
     main.scrollTop = 0;
     main.classList.add('is-embed');
-    const box = el(main, 'div', `rv-embed rv-embed-${page}` + (state.enter && plugin.settings.softEntrance !== false ? ' rv-embed-enter' : ''));
+    const box = el(main, 'div', `rv-embed rv-embed-${page}` + (state.enter && plugin.settings.softEntrance !== false ? ' rv-embed-enter' + (splashUp() ? ' is-waiting' : '') : ''));
     embed = mountEmbed(page, box, plugin, view);
     embed.start();
   }
@@ -484,6 +485,8 @@ function mountApp(view) {
     embed = null;
     main.classList.remove('is-embed');
   }
+
+  const splashUp = () => !!root.querySelector('.rv-splash:not(.is-leaving)');
 
   function render() {
     if (stopped) return;
@@ -497,20 +500,25 @@ function mountApp(view) {
     if (!state.loaded) { el(main, 'p', 'rv-muted rv-center', 'Loading…'); return; }
     if (!store.hasData()) { renderSetup(); return; }
     const page = el(main, 'div', `rv-page rv-page-${state.tab}`);
-    if (state.tab === 'today') renderNow(page, ctx);
+    let drawn = true;
+    if (state.tab === 'today') drawn = renderNow(page, ctx) !== false;
     else if (state.tab === 'habits') renderToday(page, ctx);
     else if (state.tab === 'plan') renderPlan(page, ctx);
     else if (state.tab === 'month') renderMonth(page, ctx);
     else renderAreas(page, ctx);
+    if (!drawn) return;
     if (state.enter && plugin.settings.softEntrance !== false) {
       page.classList.add('rv-enter');
+      if (splashUp()) page.classList.add('is-waiting');
       let i = 0;
       for (const child of page.children) { child.style.setProperty('--rv-i', String(i)); if (!child.classList.contains('rv-group-header')) i++; }
     }
     state.enter = false;
   }
 
-  /* Welcome: a breathing sun and a greeting, then a fade into the page. */
+  /* Welcome: the sun (or moon) breathing in a glass disc with rings rolling
+     out of it, and a greeting — then a fade into the page, whose blocks
+     wait under the splash and rise in as it lifts. */
   function greeting() {
     const h = new Date().getHours();
     return h < 5 ? 'Still up.' : h < 12 ? 'Good morning.' : h < 17 ? 'Good afternoon.' : h < 22 ? 'Good evening.' : 'Time to rest.';
@@ -518,8 +526,12 @@ function mountApp(view) {
   function showSplash() {
     const sp = el(root, 'div', 'rv-splash');
     sp.setAttribute('aria-hidden', 'true');
-    const sun = el(sp, 'div', 'rv-splash-sun');
-    icon(sun, new Date().getHours() >= 19 || new Date().getHours() < 5 ? 'moon' : 'sun');
+    const mark = el(sp, 'div', 'rv-splash-mark');
+    el(mark, 'span', 'rv-splash-glow');
+    el(mark, 'span', 'rv-splash-ring');
+    el(mark, 'span', 'rv-splash-ring is-late');
+    const core = el(mark, 'span', 'rv-splash-core');
+    icon(core, new Date().getHours() >= 19 || new Date().getHours() < 5 ? 'moon' : 'sun');
     el(sp, 'div', 'rv-splash-hello', greeting());
     el(sp, 'div', 'rv-splash-date', D.fmtLong(D.todayISO()));
     const shownAt = Date.now();
@@ -527,6 +539,7 @@ function mountApp(view) {
     const leave = () => {
       if (gone) return; gone = true;
       sp.classList.add('is-leaving');
+      for (const w of root.querySelectorAll('.is-waiting')) w.classList.remove('is-waiting');
       window.setTimeout(() => sp.remove(), 700);
     };
     sp.addEventListener('click', leave);

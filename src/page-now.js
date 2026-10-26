@@ -88,7 +88,8 @@ function renderNow(page, ctx) {
   if (!feed || feed.today !== today || state.feedStale) ctx.loadFeed();
   if (!feed || feed.today !== today) {
     el(page, 'p', 'rv-muted rv-center', state.feedError ? 'Could not read today\'s list — see the console.' : 'Gathering today…');
-    return;
+    /* Only a placeholder: the soft entrance waits for the real list. */
+    return false;
   }
 
   /* Hero: how much is still asked of today. */

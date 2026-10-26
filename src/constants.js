@@ -22,7 +22,7 @@ const DEFAULT_SETTINGS = {
   todayView: 'list',
   /* The one colour that carries meaning. An id from accents.js PRESETS, or
      'custom' with accentHex. */
-  accent: 'slate',
+  accent: 'mono',
   accentHex: '',
   /* A wallpaper behind the app: 'none', a gradient id, or 'image:<path>'
      for anything dropped in <folder>/Backgrounds. */

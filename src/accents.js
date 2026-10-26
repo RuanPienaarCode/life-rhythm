@@ -20,6 +20,7 @@
    Pure — no DOM, no obsidian import. */
 
 const PRESETS = [
+  { id: 'mono', name: 'Mono', hex: '#0a0a0a' },
   { id: 'slate', name: 'Slate', hex: '#386382' },
   { id: 'sage', name: 'Sage', hex: '#6A9B85' },
   { id: 'teal', name: 'Teal', hex: '#35787C' },
@@ -32,7 +33,23 @@ const PRESETS = [
   { id: 'system', name: 'System blue', hex: '#007AFF' },
 ];
 
-const DEFAULT_ACCENT = 'slate';
+const DEFAULT_ACCENT = 'mono';
+
+/* Mono is not one colour but two: ink black on light, white on dark — the
+   accent of the black-and-white look. Nudging one hex could only grey it
+   out in one of the themes, so its values are written out. */
+const MONO = {
+  '--rv-tint-l': '#0a0a0a',
+  '--rv-tint-d': '#ffffff',
+  '--rv-tint-text-l': '#0a0a0a',
+  '--rv-tint-text-d': '#ffffff',
+  '--rv-tint-ink-l': '#ffffff',
+  '--rv-tint-ink-d': '#000000',
+  '--rv-tint-soft-l': 'rgba(0, 0, 0, 0.06)',
+  '--rv-tint-soft-d': 'rgba(255, 255, 255, 0.1)',
+  '--rv-tint-band-l': 'rgba(0, 0, 0, 0.05)',
+  '--rv-tint-band-d': 'rgba(255, 255, 255, 0.08)',
+};
 
 /* The surfaces the accent has to hold up against. */
 const CELL_LIGHT = [255, 255, 255];
@@ -105,6 +122,11 @@ function baseOf(id, customHex) {
    part of this has to know which theme is showing — and nothing has to be
    recomputed when the user switches. */
 function accentVars(id, customHex) {
+  /* A custom hex that does not parse, or an id no longer offered, falls
+     back to the default. */
+  const known = id === 'custom' ? !!parseHex(customHex) : PRESETS.some(p => p.id === id);
+  if (!known) id = DEFAULT_ACCENT;
+  if (id === 'mono') return Object.assign({}, MONO);
   const base = baseOf(id, customHex);
   const fillL = nudge(base, BLACK, CELL_LIGHT, 3);
   const textL = nudge(base, BLACK, CELL_LIGHT, 4.5);

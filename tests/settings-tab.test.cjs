@@ -58,6 +58,7 @@ const stub = { normalizePath: p => String(p).replace(/\/+/g, '/'), PluginSetting
 const orig = Module._load;
 Module._load = function (req, ...rest) { return req === 'obsidian' ? stub : orig.call(this, req, ...rest); };
 const { RhythmSettingTab } = require('../src/settings-tab');
+const A_PRESETS = require('../src/accents').PRESETS.length;
 Module._load = orig;
 
 function makeTab(over) {
@@ -107,7 +108,7 @@ const onDots = tab => dotsOf(tab).filter(e => e.hasCls('is-on')).map(e => e.attr
     assert.strictEqual(plugin.saves, savesBefore, 'an invalid value saves nothing');
     await hex.change('abc');
     assert.strictEqual(plugin.settings.accentHex, '#aabbcc', 'a bare short hex is accepted');
-    assert.strictEqual(dotsOf(tab).filter(e => e.hasCls('rv-accent-dot')).length, 11, '10 presets + one Custom dot, never duplicated');
+    assert.strictEqual(dotsOf(tab).filter(e => e.hasCls('rv-accent-dot')).length, A_PRESETS + 1, 'every preset + one Custom dot, never duplicated');
   }
 
   /* ---- calendar status line ---- */

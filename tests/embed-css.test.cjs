@@ -26,8 +26,8 @@ assert.ok(/button\.nd-chip\.is-on\s*\{[^}]*color:\s*var\(--background-primary\)/
 assert.ok(/color:\s*var\(--fn-paper\)/.test(fort), 'Fortnight uses its paper as text');
 assert.ok((fort.match(/background-color:\s*var\(--fn-paper\)/g) || []).length >= 4, 'and as the ground of its overlays');
 
-/* under a wallpaper only the roots go clear */
-assert.ok(/\.rv-app\.has-bg \.rv-embed\.nd-app\s*\{\s*background:\s*transparent;\s*\}/.test(embed));
-assert.ok(/\.rv-app\.has-bg \.rv-embed\.fortnight\s*\{[^}]*background-color:\s*transparent/.test(embed));
+/* only the roots go clear, so Rhythm's ground or wallpaper shows behind */
+assert.ok(/\.rv-app \.rv-embed\.nd-app\s*\{\s*background:\s*transparent;\s*\}/.test(embed));
+assert.ok(/\.rv-app \.rv-embed\.fortnight\s*\{[^}]*background-color:\s*transparent/.test(embed));
 
 console.log('embed css OK');

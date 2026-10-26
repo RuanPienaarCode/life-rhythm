@@ -63,8 +63,13 @@ assert.strictEqual(A.swatchFor('sage'), '#6a9b85', 'the swatch shows the colour 
 
 /* ---- custom and nonsense ---- */
 assert.strictEqual(A.accentVars('custom', '#123456')['--rv-tint-l'], '#123456');
-assert.strictEqual(A.accentVars('custom', 'not a colour')['--rv-tint-l'], A.accentVars('slate')['--rv-tint-l'], 'a bad custom hex falls back');
-assert.strictEqual(A.accentVars('no-such-accent')['--rv-tint-l'], A.accentVars('slate')['--rv-tint-l'], 'an unknown id falls back');
+assert.deepStrictEqual(A.accentVars('custom', 'not a colour'), A.accentVars(A.DEFAULT_ACCENT), 'a bad custom hex falls back to the default');
+assert.deepStrictEqual(A.accentVars('no-such-accent'), A.accentVars(A.DEFAULT_ACCENT), 'an unknown id falls back to the default');
+/* Mono: black on light, white on dark, each with the opposite on it. */
+assert.strictEqual(A.DEFAULT_ACCENT, 'mono');
+assert.strictEqual(A.accentVars('mono')['--rv-tint-l'], '#0a0a0a');
+assert.strictEqual(A.accentVars('mono')['--rv-tint-d'], '#ffffff');
+assert.strictEqual(A.accentVars('mono')['--rv-tint-ink-d'], '#000000');
 /* A near-white accent cannot be a fill on white — it gets darkened until
    it can, rather than shipping an invisible tick. */
 const pale = A.accentVars('custom', '#f2f2f2');
