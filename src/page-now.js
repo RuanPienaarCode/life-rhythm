@@ -1,6 +1,7 @@
 'use strict';
-/* Today — everything that needs doing today, in one list: what slipped,
-   today's to-dos and reminders, the habits due, and today's events. The
+/* Today — everything that needs doing today, in three sections: Overdue
+   (what slipped from earlier days), Today (today's to-dos and reminders,
+   by time) and Habits (the practices due), then today's events. The
    list itself comes from today-feed.js; this page only draws it, in the
    same grouped-list idiom as the rest of Rhythm. A tick goes to whoever owns
    the line: a Tasks line or a reminder through the planner's store (Tasks,
@@ -78,13 +79,13 @@ function renderNow(page, ctx) {
   }
 
   if (feed.slipped.length) {
-    groupHeader(page, 'Slipped', String(feed.slipped.length));
+    groupHeader(page, 'Overdue', String(feed.slipped.length));
     const list = group(page, 'rv-list-slipped');
     for (const c of feed.slipped) cardRow(list, ctx, c, { slipped: true });
   }
 
   if (feed.todo.length) {
-    groupHeader(page, 'To do');
+    groupHeader(page, 'Today', String(feed.todo.length));
     const list = group(page);
     for (const c of feed.todo) cardRow(list, ctx, c);
   }

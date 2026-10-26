@@ -86,7 +86,7 @@ Module._load = function (request, ...rest) { return request === 'obsidian' ? stu
 
     /* the commands (Q17) */
     assert.deepStrictEqual(p.commands.map(c => c.id).sort(), [
-      'add', 'copy-deep-link', 'fortnight-review', 'fortnight-welcome', 'open', 'open-fortnight', 'open-plan',
+      'add', 'copy-deep-link', 'fortnight-review', 'fortnight-welcome', 'open', 'open-fortnight', 'open-plan', 'open-priorities',
       'open-reminders', 'open-today', 'refresh-calendars', 'reminders-add', 'reminders-add-dialog',
       'reminders-export-ics', 'reminders-lift-times', 'reminders-open-note', 'review-week', 'write-note',
     ]);

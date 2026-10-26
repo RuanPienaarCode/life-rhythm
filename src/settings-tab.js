@@ -181,10 +181,10 @@ class RhythmSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Habits shows')
-      .setDesc('A list of everything outstanding, or one card at a time from a deck you can swipe through.')
+      .setDesc('A list of everything outstanding, one card at a time from a deck you can swipe through, or the week\'s dots and review.')
       .addDropdown(d => {
         named(d.selectEl, 'Habits shows');
-        d.addOption('list', 'A list').addOption('deck', 'One at a time').setValue(s.todayView || 'list').onChange(async v => {
+        d.addOption('list', 'A list').addOption('deck', 'One at a time').addOption('week', 'The week').setValue(s.todayView || 'list').onChange(async v => {
           s.todayView = v;
           await save();
         });

@@ -1,16 +1,39 @@
 'use strict';
 /* Habits — the page that keeps the list short (Today until 0.2.0; Today
-   is now page-now.js, everything due today). */
+   is now page-now.js, everything due today). Three ways to see it: the
+   day's list, one at a time (the deck), or the week's dots and review
+   (page-week.js — the Week page until 26 Oct 2026). */
 
 const { el, button, icon } = require('./dom');
 const D = require('./dates');
 const M = require('./model');
 const { promptFor } = require('./prompts');
 const { renderDeck } = require('./deck');
+const { renderWeek } = require('./page-week');
 const { titleBar, groupHeader, group, practiceRow, eventRow, horizonLabel } = require('./widgets');
+
+const VIEWS = [
+  { id: 'list', label: 'List', icon: 'list' },
+  { id: 'deck', label: 'One at a time', icon: 'layers' },
+  { id: 'week', label: 'Week', icon: 'calendar-days' },
+];
+const viewOf = settings => (VIEWS.some(v => v.id === settings.todayView) ? settings.todayView : 'list');
+
+function viewSwitch(page, ctx, mode) {
+  const seg = el(page, 'div', 'rv-viewseg');
+  for (const v of VIEWS) {
+    const b = button(seg, 'rv-viewseg-btn' + (mode === v.id ? ' is-active' : ''), v.label, () => ctx.setTodayView(v.id), v.icon);
+    b.setAttribute('aria-pressed', mode === v.id ? 'true' : 'false');
+  }
+}
 
 function renderToday(page, ctx) {
   const { state, settings } = ctx;
+  const mode = viewOf(settings);
+  if (mode === 'week' && state.data.practices.length) {
+    renderWeek(page, ctx, { title: 'Habits', after: p => viewSwitch(p, ctx, mode) });
+    return;
+  }
   const date = state.date;
   const today = D.todayISO();
   const plan = M.planDay(state.data, date, { focusCount: settings.focusCount, weekStart: settings.weekStart });
@@ -53,19 +76,11 @@ function renderToday(page, ctx) {
     if (pr.ref) el(card, 'p', 'rv-still-ref', pr.ref);
   }
 
-  /* List or deck. The deck exists for the days when the list is long
-     enough to be a wall; the toggle only appears once it would help. */
+  /* List, deck or week. The deck exists for the days when the list is long
+     enough to be a wall; the week is where the dots and the review live. */
   const outstanding = plan.focus.length + plan.later.length;
-  const deckMode = settings.todayView === 'deck';
-  if (outstanding > 1) {
-    const seg = el(page, 'div', 'rv-viewseg');
-    const mk = (id, label, ico) => {
-      const b = button(seg, 'rv-viewseg-btn' + (deckMode === (id === 'deck') ? ' is-active' : ''), label, () => ctx.setTodayView(id), ico);
-      b.setAttribute('aria-pressed', deckMode === (id === 'deck') ? 'true' : 'false');
-    };
-    mk('list', 'List', 'list');
-    mk('deck', 'One at a time', 'layers');
-  }
+  const deckMode = mode === 'deck';
+  if (state.data.practices.length) viewSwitch(page, ctx, mode);
 
   if (deckMode && outstanding) {
     renderDeck(page, ctx, plan, date);
@@ -188,7 +203,7 @@ function renderToday(page, ctx) {
   const lastDay = D.addDays(D.weekStart(date, settings.weekStart), 6);
   if (date === lastDay) {
     const list = group(page, 'rv-list-review');
-    const row = button(list, 'rv-row', null, () => ctx.setTab('week'));
+    const row = button(list, 'rv-row', null, () => ctx.setTodayView('week'));
     icon(row, 'sparkles', 'rv-lead-glyph');
     const body = el(row, 'div', 'rv-row-body');
     el(body, 'div', 'rv-row-name', 'Review the week');

@@ -69,7 +69,7 @@ class RhythmPlugin extends Plugin {
     this.registerCommands();
     this.addSettingTab(new RhythmSettingTab(this.app, this));
 
-    /* obsidian://rhythm?tab=week — from a Shortcuts automation or a bookmark.
+    /* obsidian://rhythm?tab=habits — from a Shortcuts automation or a bookmark.
        On the Reminders page, `filter` and `add` work as Nudge's link did. */
     this.registerObsidianProtocolHandler(PROTOCOL, params => this.openFromLink(params && params.tab, params));
     this.registerObsidianProtocolHandler(NUDGE_PROTOCOL, params => this.openFromLink('reminders', params));
@@ -98,10 +98,11 @@ class RhythmPlugin extends Plugin {
     cmd('open-fortnight', 'Open Fortnight', () => this.activateView('fortnight'));
 
     cmd('open-today', "Open today's note", async () => { await this.activateView(); this.forEachView(ctl => ctl.ctx.openLog(D.todayISO())); });
-    cmd('add', 'Add a practice, goal, event or area', async () => { await this.activateView(); this.firstView(ctl => ctl.ctx.add()); });
+    cmd('add', 'Add a practice, goal, event or priority', async () => { await this.activateView(); this.firstView(ctl => ctl.ctx.add()); });
     cmd('write-note', "Write in today's note", async () => { await this.activateView(); this.firstView(ctl => ctl.ctx.writeNote(D.todayISO())); });
     cmd('open-plan', 'Plan the week ahead', () => this.activateView('plan'));
-    cmd('review-week', 'Review the week', () => this.activateView('week'));
+    cmd('review-week', 'Review the week', async () => { await this.activateView('habits'); this.firstView(ctl => ctl.ctx.setTodayView('week')); });
+    cmd('open-priorities', 'Open Priorities', () => this.activateView('priorities'));
     cmd('refresh-calendars', 'Refresh subscribed calendars', async () => {
       const r = await refreshCalendars(this);
       new Notice(`Rhythm: ${r.events.length} calendar event${r.events.length === 1 ? '' : 's'} loaded${r.errors.length ? `, ${r.errors.length} failed` : ''}.`);
@@ -217,6 +218,8 @@ class RhythmPlugin extends Plugin {
 
   async openFromLink(tab, params) {
     const page = tab || 'today';
+    /* The old Week page's link opens Habits on its Week view. */
+    if (page === 'week') { await this.activateView('habits'); this.firstView(ctl => ctl.ctx.setTodayView('week')); return; }
     if (page !== 'reminders') { await this.activateView(page); return; }
     const ctl = await this.showPage('reminders');
     if (!ctl || !ctl.ctx) return;

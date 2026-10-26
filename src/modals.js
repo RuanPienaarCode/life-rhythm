@@ -15,7 +15,7 @@ const KINDS = [
   { id: 'practice', label: 'Practice', hint: 'Something you want to keep a rhythm with — daily, weekly or monthly.' },
   { id: 'goal', label: 'Goal', hint: 'An outcome with a horizon and one next step.' },
   { id: 'event', label: 'Event', hint: 'A dated thing: a hike, a date night, a course.' },
-  { id: 'area', label: 'Area', hint: 'A part of life to keep a rhythm in. Order it on the Areas page.' },
+  { id: 'area', label: 'Priority', hint: 'A part of life to keep a rhythm in. Rank it on the Priorities page.' },
 ];
 
 const CADENCES = [
@@ -89,7 +89,7 @@ class ItemModal extends Modal {
         if (p.kind && p.kind !== this.kind) this.kind = p.kind;
         this.renderForm(form, areaOpts, editing);
       });
-      el(c, 'p', 'rv-modal-hint rv-quick-hint', 'Words like daily, 3/week, 20min, @evening, #Area, a date or "by 2027-03" fill the fields below.');
+      el(c, 'p', 'rv-modal-hint rv-quick-hint', 'Words like daily, 3/week, 20min, @evening, #Priority, a date or "by 2027-03" fill the fields below.');
     }
 
     const seg = el(c, 'div', 'rv-seg');
@@ -134,10 +134,10 @@ class ItemModal extends Modal {
          as-is, rather than silently reset to the first area in the list. */
       let opts = areaOpts;
       if (v.area && !opts.some(o => o.value === v.area)) opts = [{ value: v.area, label: v.area }, ...opts];
-      if (!opts.length) el(form, 'p', 'rv-muted', 'No areas yet — add an area first.');
+      if (!opts.length) el(form, 'p', 'rv-muted', 'No priorities yet — add a priority first.');
       else {
         if (!v.area) v.area = opts[0].value;
-        const areaSel = field('Area', select(null, 'rv-input', opts, v.area));
+        const areaSel = field('Priority', select(null, 'rv-input', opts, v.area));
         areaSel.addEventListener('change', () => { v.area = areaSel.value; this.touched.add('area'); });
       }
     }
@@ -164,7 +164,7 @@ class ItemModal extends Modal {
       const time = field('Time', input(null, 'rv-input', { type: 'time', value: v.time }));
       time.addEventListener('input', () => { v.time = time.value; this.touched.add('time'); });
     } else if (!editing) {
-      const note = field('About', input(null, 'rv-input', { type: 'text', placeholder: 'A line about what this area is for', value: v.body }));
+      const note = field('About', input(null, 'rv-input', { type: 'text', placeholder: 'A line about what this priority is for', value: v.body }));
       note.addEventListener('input', () => { v.body = note.value; });
     }
   }
@@ -174,7 +174,7 @@ class ItemModal extends Modal {
     const name = (v.name || '').trim();
     if (!name) { new Notice('Rhythm: give it a name.'); return; }
     const kind = this.kind;
-    if (kind !== 'area' && !v.area) { new Notice('Rhythm: add an area first.'); return; }
+    if (kind !== 'area' && !v.area) { new Notice('Rhythm: add a priority first.'); return; }
     if (kind === 'goal' && v.horizon && !/^\d{4}-\d{2}(-\d{2})?$/.test(v.horizon.trim())) { new Notice('Rhythm: "By" wants YYYY-MM.'); return; }
     if (kind === 'event' && !D.isISO(v.date)) { new Notice('Rhythm: pick a date.'); return; }
     this.close();

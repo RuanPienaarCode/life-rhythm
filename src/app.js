@@ -13,7 +13,6 @@ const { renderToday } = require('./page-today');
 const { renderNow } = require('./page-now');
 const { loadFeed } = require('./today-feed');
 const { why } = require('./planner/board');
-const { renderWeek } = require('./page-week');
 const { renderMonth } = require('./page-month');
 const { renderAreas } = require('./page-areas');
 const { renderPlan } = require('./page-plan');
@@ -29,16 +28,21 @@ const { mountEmbed, EMBEDS } = require('./embed');
 const TABS = [
   /* Everything due today, from every module (page-now.js). */
   { id: 'today', label: 'Today' },
-  /* The practices page (page-today.js) — "Today" until 0.2.0. */
-  { id: 'habits', label: 'Habits' },
   { id: 'reminders', label: 'Reminders' },
+  /* The practices page (page-today.js) — "Today" until 0.2.0. Its Week
+     view is the old Week page (page-week.js). */
+  { id: 'habits', label: 'Habits' },
   { id: 'fortnight', label: 'Fortnight' },
-  { id: 'week', label: 'Week' },
   { id: 'month', label: 'Month' },
   { id: 'plan', label: 'Plan' },
-  { id: 'areas', label: 'Areas' },
+  /* The areas, in priority order (page-areas.js) — "Areas" until 26 Oct 2026. */
+  { id: 'priorities', label: 'Priorities' },
 ];
-const isTab = id => TABS.some(t => t.id === id);
+/* Pages that were renamed or folded in: an old deep link, a saved view or
+   a bookmark still lands on the page that took its place. */
+const ALIASES = { areas: 'priorities', week: 'habits' };
+const pageId = id => (ALIASES[id] || id);
+const isTab = id => TABS.some(t => t.id === pageId(id));
 
 function mountApp(view) {
   const plugin = view.plugin;
@@ -55,7 +59,7 @@ function mountApp(view) {
   const loaded = new Promise(r => { markLoaded = r; });
 
   const state = {
-    tab: isTab(view.initialTab) ? view.initialTab : 'today',
+    tab: isTab(view.initialTab) ? pageId(view.initialTab) : 'today',
     date: D.todayISO(),
     data: { areas: [], practices: [], aside: [], goals: [], events: [], log: new Map() },
     loaded: false,
@@ -147,6 +151,7 @@ function mountApp(view) {
     },
     setDate(iso) { state.date = iso; state.deckOffset = 0; state.enter = true; render(); },
     setTab(id) {
+      id = pageId(id);
       if (!isTab(id) || id === state.tab) { if (isTab(id)) render(); return; }
       state.tab = id; state.deckOffset = 0; state.enter = true;
       render();
@@ -155,6 +160,7 @@ function mountApp(view) {
     /* Show a page and hand back its board once it is running (null for
        Rhythm's own pages). */
     async showPage(id) {
+      id = pageId(id);
       ctx.setTab(id);
       await loaded;
       if (!EMBEDS[id] || state.tab !== id) return null;
@@ -349,9 +355,9 @@ function mountApp(view) {
       if (!state.loaded || !store.hasData()) add.disabled = true;
     }
 
-    /* Eight tabs scroll sideways on a phone. The bar is rebuilt on every
+    /* Seven tabs scroll sideways on a phone. The bar is rebuilt on every
        render, so keep where it was scrolled to, and bring the page you are
-       on into view (Plan and Areas start past the right edge). */
+       on into view (Plan and Priorities start past the right edge). */
     const scrolled = nav.scrollLeft;
     clear(nav);
     for (const t of TABS) {
@@ -436,7 +442,6 @@ function mountApp(view) {
     if (state.tab === 'today') renderNow(page, ctx);
     else if (state.tab === 'habits') renderToday(page, ctx);
     else if (state.tab === 'plan') renderPlan(page, ctx);
-    else if (state.tab === 'week') renderWeek(page, ctx);
     else if (state.tab === 'month') renderMonth(page, ctx);
     else renderAreas(page, ctx);
     if (state.enter && plugin.settings.softEntrance !== false) {
@@ -493,7 +498,7 @@ function mountApp(view) {
     if (document.querySelector('.modal')) return;
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     const k = e.key;
-    if (/^[1-7]$/.test(k) && state.tab === 'habits') {
+    if (/^[1-7]$/.test(k) && state.tab === 'habits' && plugin.settings.todayView !== 'week') {
       const plan = M.planDay(state.data, state.date, { focusCount: plugin.settings.focusCount, weekStart: plugin.settings.weekStart });
       const r = plan.focus[parseInt(k, 10) - 1];
       if (r) { e.preventDefault(); ctx.toggle(r.p.name, state.date, true); }
@@ -502,8 +507,9 @@ function mountApp(view) {
     if (k === 'ArrowLeft' || k === 'ArrowRight') {
       const dir = k === 'ArrowLeft' ? -1 : 1;
       e.preventDefault();
-      if (state.tab === 'habits') ctx.setDate(D.addDays(state.date, dir));
-      else if (state.tab === 'week' || state.tab === 'plan') ctx.setDate(D.addDays(state.date, 7 * dir));
+      const weekly = state.tab === 'plan' || (state.tab === 'habits' && plugin.settings.todayView === 'week');
+      if (weekly) ctx.setDate(D.addDays(state.date, 7 * dir));
+      else if (state.tab === 'habits') ctx.setDate(D.addDays(state.date, dir));
       else if (state.tab === 'month') ctx.setDate(D.addMonths(state.date, dir));
       return;
     }
@@ -565,4 +571,4 @@ function mountApp(view) {
   };
 }
 
-module.exports = { mountApp, TABS };
+module.exports = { mountApp, TABS, pageId };

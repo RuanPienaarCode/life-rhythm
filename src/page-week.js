@@ -1,13 +1,17 @@
 'use strict';
 /* Week — two-line rows (name and count; cadence and seven dots) under a
-   shared column header, and the week in review. */
+   shared column header, and the week in review. The Habits page's Week
+   view since 26 Oct 2026 (a page of its own before): o.title names the page and
+   o.after draws what sits under the title (the view switch). */
 
 const { el, button, icon } = require('./dom');
 const D = require('./dates');
 const M = require('./model');
 const { titleBar, groupHeader, group, emptyLine, bar } = require('./widgets');
 
-function renderWeek(page, ctx) {
+function renderWeek(page, ctx, o) {
+  const opts = o || {};
+  page.classList.add('rv-page-week');
   const { state, settings } = ctx;
   const date = state.date;
   const today = D.todayISO();
@@ -18,12 +22,14 @@ function renderWeek(page, ctx) {
     ? `${D.fromISO(first).getDate()} – ${D.fmtDay(last)}`
     : `${D.fmtDay(first)} – ${D.fmtDay(last)}`;
 
-  titleBar(page, range, thisWeek ? 'This week' : (last < today ? 'A past week' : 'A week ahead'), {
+  const when = thisWeek ? 'This week' : (last < today ? 'A past week' : 'A week ahead');
+  titleBar(page, opts.title ? `${when} · ${range}` : range, opts.title || when, {
     prev: () => ctx.setDate(D.addDays(first, -7)),
     next: () => ctx.setDate(D.addDays(first, 7)),
     reset: thisWeek ? null : () => ctx.setDate(today),
     resetLabel: 'Back to this week',
   });
+  if (opts.after) opts.after(page);
 
   const rows = M.weekSummary(state.data, date, settings.weekStart);
   if (!rows.length) { emptyLine(page, 'No practices yet.'); return; }
