@@ -766,5 +766,46 @@ const rhythm = { rhythm: { settings: {} } };
     assert.ok(/^- \[x\] Call plumber ✅ \d{4}-\d{2}-\d{2}$/.test(app.files.get('H.md')), app.files.get('H.md'));
   }
 
+  /* 28. Today's Delete: a to-do's line leaves its note and putBack returns
+         it to the same line; a changed line is refused; events are fixed */
+  {
+    const app = makeApp({ 'H.md': '# Home\n- [ ] Fix the gate\nnotes' });
+    const store = makeStore({ app, settings: {} });
+    const card = { source: 'tasks', path: 'H.md', line: 1, raw: '- [ ] Fix the gate' };
+    const r = await store.remove(card);
+    assert.deepStrictEqual(r, { ok: true, path: 'H.md', line: 1, raw: '- [ ] Fix the gate' });
+    assert.strictEqual(app.files.get('H.md'), '# Home\nnotes');
+    assert.deepStrictEqual(await store.putBack(r), { ok: true });
+    assert.strictEqual(app.files.get('H.md'), '# Home\n- [ ] Fix the gate\nnotes');
+    assert.deepStrictEqual(await store.remove({ source: 'tasks', path: 'H.md', line: 1, raw: '- [ ] Fix the fence' }), { ok: false, reason: 'changed' });
+    assert.deepStrictEqual(await store.remove({ source: 'event', path: 'e' }), { ok: false, reason: 'locked' });
+  }
+
+  /* 29. a reminder is deleted through the reminders module, and Undo puts
+         its line back in the reminders note */
+  {
+    const raw = '- [ ] Phone the dentist 📅 2026-10-01';
+    const removed = [];
+    const nudge = { isOurs: p => p === 'Reminders.md', path: () => 'Reminders.md',
+      load: async () => ({ items: [{ raw, line: 1, group: '' }] }),
+      remove: async item => { removed.push(item.raw); app.files.set('Reminders.md', '# Inbox'); return { ok: true }; } };
+    const app = makeApp({ 'Reminders.md': `# Inbox\n${raw}` }, { 'nudge-reminders': { store: nudge } });
+    const store = makeStore({ app, settings: {} });
+    const r = await store.remove({ source: 'nudge', path: 'Reminders.md', line: 1, raw });
+    assert.deepStrictEqual(r, { ok: true, path: 'Reminders.md', line: 1, raw });
+    assert.deepStrictEqual(removed, [raw]);
+    await store.putBack(r);
+    assert.strictEqual(app.files.get('Reminders.md'), `# Inbox\n${raw}`);
+  }
+
+  /* 30. Edit: Tasks' answer replaces the to-do's line, and nothing else */
+  {
+    const app = makeApp({ 'H.md': '- [ ] Call plumber\n- [ ] File tax' });
+    const store = makeStore({ app, settings: {} });
+    assert.deepStrictEqual(await store.rewrite({ source: 'tasks', path: 'H.md', line: 0, raw: '- [ ] Call plumber' }, '- [ ] Call the plumber 📅 2026-10-30'), { ok: true });
+    assert.strictEqual(app.files.get('H.md'), '- [ ] Call the plumber 📅 2026-10-30\n- [ ] File tax');
+    assert.deepStrictEqual(await store.rewrite({ source: 'nudge', path: 'R.md', line: 0, raw: 'x' }, 'y'), { ok: false, reason: 'unknown' });
+  }
+
   console.log('store-write OK');
 })().catch(e => { console.error(e); process.exit(1); });

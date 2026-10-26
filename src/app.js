@@ -17,7 +17,8 @@ const { renderMonth } = require('./page-month');
 const { renderAreas } = require('./page-areas');
 const { renderPlan } = require('./page-plan');
 const { undoMove } = require('./day-menu');
-const { openAddModal, openEditModal, openNextStepModal, openNoteModal } = require('./modals');
+const { openAddModal, openEditModal, openNextStepModal, openNoteModal, openDateModal } = require('./modals');
+const { openEditor: openReminderEditor } = require('./reminders/modals');
 const { refreshCalendars, calendarEvents, isStale, urls } = require('./calendar');
 const { applyAccent } = require('./accents');
 const { applyBackground } = require('./backgrounds');
@@ -197,6 +198,63 @@ function mountApp(view) {
       ctx.feedChanged();
     },
     openCard(card) { plugin.planner.openTask(card); },
+    /* The Today page's right-click menu (page-now.js): the same writes the
+       Fortnight board makes, refused the same way when a line changed. */
+    async moveCard(card, date) {
+      let r;
+      try { r = await plugin.planner.store.move(card, date); }
+      catch (e) { console.error('rhythm move', e); r = { ok: false, reason: 'error' }; }
+      if (r && r.ok === false) { if (r.reason !== 'busy') new Notice(`Rhythm: couldn't move "${card.text}": ${why(r.reason)}.`); }
+      else ctx.toast(`${card.text} → ${D.relative(date, D.todayISO())}`);
+      ctx.feedChanged();
+    },
+    async removeCard(card) {
+      const pstore = plugin.planner.store;
+      let r;
+      try { r = await pstore.remove(card); }
+      catch (e) { console.error('rhythm delete', e); r = { ok: false, reason: 'error' }; }
+      if (r && r.ok === false) { if (r.reason !== 'busy') new Notice(`Rhythm: couldn't delete "${card.text}": ${why(r.reason)}.`); }
+      else {
+        ctx.toast(`Deleted: ${card.text}`, 'Undo', async () => {
+          let b;
+          try { b = await pstore.putBack(r); } catch (e) { console.error('rhythm undo delete', e); b = { ok: false }; }
+          if (!b.ok) new Notice(`Rhythm: couldn't put "${card.text}" back.`);
+          ctx.feedChanged();
+        });
+      }
+      ctx.feedChanged();
+    },
+    /* A reminder opens in the reminders editor; a to-do in Tasks' own edit
+       box when Tasks is there, or in its note at its line when it is not. */
+    async editCard(card) {
+      const pstore = plugin.planner.store;
+      if (card.source === 'nudge') {
+        const ours = plugin.reminders && plugin.reminders.store;
+        const held = ours ? await pstore.reminderFor(card) : null;
+        if (!held) { new Notice(`Rhythm: couldn't open "${card.text}": ${why(ours ? 'changed' : 'no-nudge')}.`); ctx.feedChanged(); return; }
+        const { groups } = await ours.load();
+        const done = (r, what) => { if (r && r.ok === false) new Notice(`Rhythm: "${card.text}" changed in its note — ${what}.`); ctx.feedChanged(); };
+        openReminderEditor(app, {
+          item: held, groups: groups || [], today: D.todayISO(),
+          onSave: async fields => done(await ours.update(held, fields), 'your changes were not saved'),
+          onDelete: async () => done(await ours.remove(held), 'nothing was deleted'),
+        });
+        return;
+      }
+      const tp = app.plugins && app.plugins.plugins && app.plugins.plugins['obsidian-tasks-plugin'];
+      const api = tp && tp.apiV1 && typeof tp.apiV1.editTaskLineModal === 'function' ? tp.apiV1 : null;
+      if (card.source !== 'tasks' || !api) { ctx.openCard(card); return; }
+      const before = card.raw.replace(/\r$/, '');
+      let after;
+      try { after = await api.editTaskLineModal(before); }
+      catch (e) { console.error('rhythm edit', e); ctx.openCard(card); return; }
+      if (typeof after !== 'string' || after === before) return;
+      const r = await pstore.rewrite(card, after);
+      if (r && r.ok === false && r.reason !== 'busy') new Notice(`Rhythm: couldn't save "${card.text}": ${why(r.reason)}.`);
+      ctx.feedChanged();
+    },
+    /* Pick any day for a card (the menu offers the next fortnight). */
+    pickCardDate(card) { openDateModal(app, ctx, card.text, card.date || D.todayISO(), date => ctx.moveCard(card, date)); },
     rerender() { render(); },
     async setAccent(id, hex) {
       plugin.settings.accent = id;

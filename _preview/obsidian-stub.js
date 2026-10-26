@@ -110,11 +110,14 @@ export class Menu {
     const item = { title: '', icon: '', onClick: null,
       setTitle(t) { this.title = t; return this; },
       setIcon(i) { this.icon = i; return this; },
+      setWarning(w) { this.warning = w; return this; },
+      setDisabled(d) { this.disabled = d; return this; },
       onClick(f) { this.onClick = f; return this; } };
     fn(item);
     this.items.push(item);
     return this;
   }
+  addSeparator() { return this; }
   showAtPosition(pos) {
     const m = document.createElement('div');
     m.className = 'stub-menu';

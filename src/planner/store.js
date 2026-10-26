@@ -587,7 +587,57 @@ function makeStore(plugin) {
     return { ok: false, reason: 'unknown' };
   }
 
-  return { load, loadRhythm, isRelevant, move, park, revert, drop, tick, add, reviewTarget, writeReview, plannerPath, problems: () => problems.slice() };
+  /* Delete: the line leaves its note — a to-do from the note it is written
+     in, a reminder through the reminders module. Says where it was and what
+     it read, so the page can offer Undo (putBack). Events are fixed. */
+  function remove(card) { return once(card, () => removeNow(card)); }
+  async function removeNow(card) {
+    if (card.source === 'event') return { ok: false, reason: 'locked' };
+    if (card.source === 'tasks') {
+      const r = await editLine(card, () => REMOVE);
+      return r.ok ? { ok: true, path: card.path, line: card.line, raw: card.raw } : r;
+    }
+    if (card.source === 'nudge') {
+      const ours = nudge();
+      if (!ours || typeof ours.remove !== 'function') return { ok: false, reason: 'no-nudge' };
+      const held = await nudgeHolds(ours, card);
+      if (!held) return { ok: false, reason: 'changed' };
+      const r = await ours.remove(held);
+      return r && r.ok === false ? { ok: false, reason: r.reason || 'changed' } : { ok: true, path: ours.path(), line: held.line, raw: held.raw };
+    }
+    return { ok: false, reason: 'unknown' };
+  }
+
+  /* Undo a delete: the line goes back at the line it was on (or at the
+     end, if the note has grown shorter since). `gone` is what remove gave. */
+  async function putBack(gone) {
+    const file = gone && app.vault.getFileByPath(gone.path);
+    if (!file) return { ok: false, reason: 'missing' };
+    await app.vault.process(file, text => {
+      const lines = text.split('\n');
+      lines.splice(Math.min(gone.line, lines.length), 0, gone.raw);
+      return lines.join('\n');
+    });
+    return { ok: true };
+  }
+
+  /* Edit a to-do: its line becomes `text` (Tasks' edit box answers with the
+     whole new line, sometimes two for a repeat). Refused, like every write,
+     if the line is no longer what the card read. */
+  function rewrite(card, text) {
+    if (card.source !== 'tasks') return Promise.resolve({ ok: false, reason: 'unknown' });
+    return once(card, () => editLine(card, () => (text === '' ? REMOVE : text)));
+  }
+
+  /* The reminders module's own copy of a reminder card, for its editor; null
+     if it is gone or changed since the card was read. */
+  async function reminderFor(card) {
+    const ours = nudge();
+    if (!ours || card.source !== 'nudge') return null;
+    return nudgeHolds(ours, card);
+  }
+
+  return { load, loadRhythm, isRelevant, move, park, revert, drop, tick, remove, putBack, rewrite, reminderFor, add, reviewTarget, writeReview, plannerPath, problems: () => problems.slice() };
 }
 
 module.exports = { makeStore };

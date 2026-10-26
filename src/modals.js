@@ -327,11 +327,49 @@ class NoteModal extends Modal {
   onClose() { clear(this.contentEl); }
 }
 
+/* "Change date": one date field, for a to-do or a reminder on the Today
+   page. `onPick` gets the chosen YYYY-MM-DD. */
+class DateModal extends Modal {
+  constructor(app, ctx, name, date, onPick) {
+    super(app);
+    this.ctx = ctx;
+    this.name = name;
+    this.date = date;
+    this.onPick = onPick;
+  }
+  onOpen() {
+    this.modalEl && this.modalEl.classList.add('rv-modal');
+    applyAccent(this.contentEl, this.ctx.settings);
+    const c = this.contentEl;
+    clear(c);
+    c.classList.add('rv-app', 'rv-modal-body');
+    el(c, 'h2', 'rv-modal-title', 'Change date');
+    el(c, 'p', 'rv-modal-hint', `Which day is "${this.name}" for?`);
+    const f = el(el(c, 'div', 'rv-form'), 'label', 'rv-field');
+    el(f, 'span', 'rv-field-label', 'Date');
+    const inp = input(f, 'rv-input', { type: 'date', value: this.date });
+    inp.addEventListener('input', () => { this.date = inp.value; });
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); this.save(); } });
+    const actions = el(c, 'div', 'rv-modal-actions');
+    button(actions, 'rv-btn', 'Cancel', () => this.close());
+    button(actions, 'rv-btn rv-btn-primary', 'Move', () => this.save());
+    window.setTimeout(() => inp.focus(), 30);
+  }
+  save() {
+    const date = this.date;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '')) { new Notice('Rhythm: pick a date first.'); return; }
+    this.close();
+    this.onPick(date);
+  }
+  onClose() { clear(this.contentEl); }
+}
+
 const cmdLabel = () => (navigator.platform && /mac|iphone|ipad/i.test(navigator.platform) ? '⌘' : 'Ctrl+');
 
 function openAddModal(app, ctx, kind) { new ItemModal(app, ctx, { kind }).open(); }
 function openNoteModal(app, ctx, date) { new NoteModal(app, ctx, date).open(); }
 function openEditModal(app, ctx, kind, rec) { new ItemModal(app, ctx, { kind, rec }).open(); }
 function openNextStepModal(app, ctx, goal) { new NextStepModal(app, ctx, goal).open(); }
+function openDateModal(app, ctx, name, date, onPick) { new DateModal(app, ctx, name, date, onPick).open(); }
 
-module.exports = { openAddModal, openEditModal, openNextStepModal, openNoteModal, ItemModal, NextStepModal, NoteModal, KINDS, CADENCES };
+module.exports = { openAddModal, openEditModal, openNextStepModal, openNoteModal, openDateModal, ItemModal, NextStepModal, NoteModal, KINDS, CADENCES };

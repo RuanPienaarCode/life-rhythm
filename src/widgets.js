@@ -98,6 +98,8 @@ function practiceRow(list, ctx, r, date, opts) {
   if (bits.length) el(body, 'div', 'rv-row-meta', bits.join(' · '));
   const more = button(row, 'rv-row-more', null, e => rowMenu(e, ctx, r, date), 'ellipsis');
   more.setAttribute('aria-label', `More for ${p.name}`);
+  /* Right-click opens the same menu as (…). */
+  row.addEventListener('contextmenu', e => { e.preventDefault(); rowMenu(e, ctx, r, date); });
   return row;
 }
 

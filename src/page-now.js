@@ -6,8 +6,10 @@
    same grouped-list idiom as the rest of Rhythm. A tick goes to whoever owns
    the line: a Tasks line or a reminder through the planner's store (Tasks,
    repeats and ✅ handled as on the Fortnight board), a habit through
-   Rhythm's own toggle (with its undo). */
+   Rhythm's own toggle (with its undo). Right-click (or the … button, which
+   a phone can reach) moves, edits or deletes a to-do or a reminder. */
 
+const { Menu } = require('obsidian');
 const { el, button, icon } = require('./dom');
 const D = require('./dates');
 const { titleBar, groupHeader, group, practiceRow } = require('./widgets');
@@ -15,7 +17,30 @@ const { titleBar, groupHeader, group, practiceRow } = require('./widgets');
 const noteName = p => String(p || '').split('/').pop().replace(/\.md$/, '');
 const URGENT = new Set(['highest', 'high']);
 
-/* A Tasks line or a reminder: tick · name + where it lives · time. */
+/* Move to today (when it slipped) or tomorrow, any other date, edit, open
+   the note, delete. A done line has no day left to move to. */
+function cardMenu(ev, ctx, card) {
+  const today = D.todayISO();
+  const tomorrow = D.addDays(today, 1);
+  const menu = new Menu();
+  if (!card.done) {
+    if (card.date !== today) menu.addItem(i => i.setTitle('Move to today').setIcon('calendar-check').onClick(() => ctx.moveCard(card, today)));
+    if (card.date !== tomorrow) menu.addItem(i => i.setTitle('Move to tomorrow').setIcon('calendar-plus').onClick(() => ctx.moveCard(card, tomorrow)));
+    menu.addItem(i => i.setTitle('Change date…').setIcon('calendar').onClick(() => ctx.pickCardDate(card)));
+    menu.addSeparator();
+  }
+  menu.addItem(i => i.setTitle('Edit').setIcon('pencil').onClick(() => ctx.editCard(card)));
+  menu.addItem(i => i.setTitle('Open note').setIcon('external-link').onClick(() => ctx.openCard(card)));
+  menu.addSeparator();
+  menu.addItem(i => {
+    i.setTitle('Delete').setIcon('trash-2').onClick(() => ctx.removeCard(card));
+    if (i.setWarning) i.setWarning(true);
+  });
+  if (ev && ev.clientX !== undefined && menu.showAtMouseEvent) menu.showAtMouseEvent(ev);
+  else if (menu.showAtPosition && ev && ev.target) { const b = ev.target.getBoundingClientRect(); menu.showAtPosition({ x: b.left, y: b.bottom }); }
+}
+
+/* A Tasks line or a reminder: tick · name + where it lives · time · (…) */
 function cardRow(list, ctx, card, opts) {
   const slipped = opts && opts.slipped;
   const row = el(list, 'div', 'rv-row rv-row-card' + (card.done ? ' is-done' : '') + (slipped ? ' is-slipped' : ''));
@@ -37,6 +62,9 @@ function cardRow(list, ctx, card, opts) {
     const trail = el(row, 'div', 'rv-row-trail');
     el(trail, 'span', 'rv-stack-time', card.time);
   }
+  const more = button(row, 'rv-row-more', null, e => cardMenu(e, ctx, card), 'ellipsis');
+  more.setAttribute('aria-label', `More for ${card.text}`);
+  row.addEventListener('contextmenu', e => { e.preventDefault(); cardMenu(e, ctx, card); });
   return row;
 }
 
@@ -121,4 +149,4 @@ function renderNow(page, ctx) {
   }
 }
 
-module.exports = { renderNow, cardRow };
+module.exports = { renderNow, cardRow, cardMenu };
