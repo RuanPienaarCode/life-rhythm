@@ -23,6 +23,7 @@ const { refreshCalendars, calendarEvents, isStale, urls } = require('./calendar'
 const { applyAccent } = require('./accents');
 const { applyBackground } = require('./backgrounds');
 const { mountEmbed, EMBEDS } = require('./embed');
+const { mountMoreSheet } = require('./more-sheet');
 
 /* Rhythm's own pages, and the two module boards (Reminders, Fortnight)
    mounted as pages — see embed.js. */
@@ -39,6 +40,11 @@ const TABS = [
   /* The areas, in priority order (page-areas.js) — "Areas" until 26 Oct 2026. */
   { id: 'priorities', label: 'Priorities', icon: 'list-ordered' },
 ];
+/* On a phone the tabs are a floating dock (styles.css): the first DOCK_SLOTS
+   pages are slots of their own, a More slot opens the rest in a bottom sheet
+   (more-sheet.js). Seven labelled 44px slots do not fit a 375px screen. The
+   wide segmented control still shows all seven. */
+const DOCK_SLOTS = 4;
 /* Pages that were renamed or folded in: an old deep link, a saved view or
    a bookmark still lands on the page that took its place. */
 const ALIASES = { areas: 'priorities', week: 'habits' };
@@ -83,6 +89,13 @@ function mountApp(view) {
 
   let header, nav, main, toastEl, reloadTimer = null, toastTimer = null, stopped = false, resizeObserver = null;
   let feedLoading = false, feedAgain = false;
+  /* The dock's More slot: the pages past DOCK_SLOTS, as a bottom sheet. */
+  const moreSheet = mountMoreSheet(root, {
+    items: () => TABS.slice(DOCK_SLOTS),
+    current: () => state.tab,
+    pick: id => ctx.setTab(id),
+    toggle: () => (nav ? nav.querySelector('.rv-tab-more') : null),
+  });
 
   const fail = (what, e, msg) => { console.error('rhythm ' + what, e); new Notice('Rhythm: ' + msg); };
   /* io.js refuses a write it cannot make safely and says why. */
@@ -413,20 +426,29 @@ function mountApp(view) {
       if (!state.loaded || !store.hasData()) add.disabled = true;
     }
 
-    /* Seven tabs scroll sideways on a phone. The bar is rebuilt on every
-       render, so keep where it was scrolled to, and bring the page you are
-       on into view (Plan and Priorities start past the right edge). */
+    /* The bar is rebuilt on every render. Wide: seven segments that scroll
+       sideways, so keep where it was scrolled to and bring the page you are
+       on into view. Phone: the dock (DOCK_SLOTS pages + More, which is
+       current when the page is one of the rest); the CSS hides the extra
+       segments and the More slot where they do not belong. */
     const scrolled = nav.scrollLeft;
     clear(nav);
-    for (const t of TABS) {
-      /* The icon shows only in the phone tab bar (styles.css). */
-      const b = button(nav, 'rv-tab' + (state.tab === t.id ? ' is-active' : ''), t.label, () => ctx.setTab(t.id), t.icon);
+    TABS.forEach((t, i) => {
+      /* The icon shows only in the phone dock (styles.css). */
+      const b = button(nav, 'rv-tab' + (i >= DOCK_SLOTS ? ' rv-tab-more-item' : '') + (state.tab === t.id ? ' is-active' : ''), t.label, () => ctx.setTab(t.id), t.icon);
       b.setAttribute('aria-selected', state.tab === t.id ? 'true' : 'false');
       b.setAttribute('role', 'tab');
-    }
+    });
+    const inMore = TABS.findIndex(t => t.id === state.tab) >= DOCK_SLOTS;
+    const more = button(nav, 'rv-tab rv-tab-more' + (inMore ? ' is-active' : ''), 'More', () => moreSheet.open(), 'ellipsis');
+    more.setAttribute('role', 'tab');
+    more.setAttribute('aria-selected', inMore ? 'true' : 'false');
+    more.setAttribute('aria-haspopup', 'dialog');
+    more.setAttribute('aria-expanded', moreSheet.isOpen() ? 'true' : 'false');
+    moreSheet.sync();
     nav.scrollLeft = scrolled;
     const on = nav.querySelector('.rv-tab.is-active');
-    if (on && nav.scrollWidth > nav.clientWidth) {
+    if (on && on.offsetWidth && nav.scrollWidth > nav.clientWidth) {
       const nb = nav.getBoundingClientRect(), ab = on.getBoundingClientRect();
       if (ab.left < nb.left) nav.scrollLeft -= nb.left - ab.left + 12;
       else if (ab.right > nb.right) nav.scrollLeft += ab.right - nb.right + 12;
@@ -613,6 +635,8 @@ function mountApp(view) {
           const w = entries[0].contentRect.width;
           root.classList.toggle('is-narrow', w < 560);
           root.classList.toggle('is-xnarrow', w < 480);
+          /* The sheet belongs to the phone dock only. */
+          if (w >= 560) moreSheet.close(false);
         });
         resizeObserver.observe(root);
       }
@@ -628,7 +652,7 @@ function mountApp(view) {
       if (splash) splash.leave();
       if (isStale(plugin)) ctx.refreshCalendars(true);
     },
-    stop() { stopped = true; dropEmbed(); if (reloadTimer) clearTimeout(reloadTimer); if (toastTimer) clearTimeout(toastTimer); if (resizeObserver) resizeObserver.disconnect(); },
+    stop() { stopped = true; moreSheet.close(false); dropEmbed(); if (reloadTimer) clearTimeout(reloadTimer); if (toastTimer) clearTimeout(toastTimer); if (resizeObserver) resizeObserver.disconnect(); },
     render,
     /* The pane was resized: a board that lays itself out by width (Fortnight's
        phone view) is told. */
@@ -642,4 +666,4 @@ function mountApp(view) {
   };
 }
 
-module.exports = { mountApp, TABS, pageId };
+module.exports = { mountApp, TABS, DOCK_SLOTS, pageId };

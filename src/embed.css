@@ -141,8 +141,9 @@ body:not(.is-mobile) .rv-app .rv-embed.nd-app .nd-side {
 /* The soft entrance, as Rhythm's own pages have it. */
 .rv-app .rv-embed.rv-embed-enter { animation: rv-rise 640ms var(--rv-ease) both; }
 
-/* Seven pages: the segmented control (and the phone's bottom tab bar)
-   scrolls sideways rather than squeezing labels. */
+/* Seven pages: the wide segmented control scrolls sideways rather than
+   squeezing labels. (The phone's dock takes four slots and a More sheet, and
+   overrides these in styles.css.) */
 .rv-app .rv-tabs { overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
 .rv-app .rv-tabs::-webkit-scrollbar { display: none; }
 .rv-app button.rv-tab { flex: 1 0 auto; }

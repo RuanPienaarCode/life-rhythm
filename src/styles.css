@@ -202,7 +202,7 @@
 .rv-app button.rv-add .rv-icon svg { width: 16px; height: 16px; stroke-width: 2.5; }
 
 /* The segmented control sits centred in the toolbar on wide panes and
-   becomes a bottom tab bar on phone-narrow ones. */
+   becomes the floating dock on phone-narrow ones (below). */
 .rv-app .rv-tabs {
   position: absolute;
   z-index: 3;
@@ -228,37 +228,94 @@
 /* Each tab carries its icon; only the phone tab bar shows it. */
 .rv-app button.rv-tab .rv-icon { display: none; }
 .rv-app button.rv-tab.is-active { background: var(--rv-seg-on); box-shadow: var(--rv-seg-shadow); font-weight: 600; }
+/* The dock's More slot exists only on a phone-narrow pane. */
+.rv-app button.rv-tab.rv-tab-more { display: none; }
 
+/* ---- the phone dock --------------------------------------------------- */
 /* Keyed on the PANE's width (an .is-narrow class the ResizeObserver in
    app.js keeps in sync), not the window's — a narrow sidebar on desktop
-   is exactly as cramped as a phone screen. Docked glass, every page as an
-   icon over a small label in equal columns, the page you are on a raised
-   glass capsule. Equal columns from the grid itself, so the count of
-   pages is not written here. */
+   is exactly as cramped as a phone screen. Same bar as Bible Notes' dock: a
+   rounded bar floating at the bottom of the view (absolute inside this
+   non-scrolling root, never fixed — Obsidian has several leaves), the page
+   scrolling behind it. Seven pages do not fit as labelled 44px slots at 375,
+   so the first four are slots and More opens the rest (more-sheet.js). No
+   coloured glows. */
+.rv-app.is-narrow {
+  --rv-dock-h: 64px;
+  --rv-dock-bottom: max(16px, calc(10px + env(safe-area-inset-bottom, 0px)));
+  --rv-dock-clear: calc(var(--rv-dock-bottom) + var(--rv-dock-h) + 48px);
+  --rv-dock-edge: rgba(0, 0, 0, 0.18);
+  --rv-scrim: rgba(0, 0, 0, 0.4);
+}
+.theme-dark .rv-app.is-narrow { --rv-dock-edge: rgba(255, 255, 255, 0.18); --rv-scrim: rgba(0, 0, 0, 0.6); }
+/* With Obsidian's floating navigation bar the dock stands above that bar. */
+.is-phone.is-floating-nav .rv-app.is-narrow, .is-phone.auto-full-screen .rv-app.is-narrow {
+  --rv-dock-bottom: calc(var(--navbar-bottom-offset, 12px) + var(--navbar-height, 44px) + 16px);
+}
 .rv-app.is-narrow .rv-tabs {
-  top: auto; bottom: 0; left: 0; right: 0; transform: none; max-width: none;
-  display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 0;
-  padding: 4px 4px calc(4px + env(safe-area-inset-bottom, 0px)); border-radius: 0;
-  background: var(--rv-glass-chrome);
-  -webkit-backdrop-filter: var(--rv-glass-blur);
-  backdrop-filter: var(--rv-glass-blur);
-  box-shadow: inset 0 0.5px 0 var(--rv-glass-line), inset 0 1px 0 var(--rv-glass-hi);
-  overflow: hidden;
+  top: auto; right: auto; bottom: var(--rv-dock-bottom); left: 50%; transform: translateX(-50%);
+  width: min(380px, calc(100% - 24px)); max-width: none; height: var(--rv-dock-h); padding: 5px; gap: 0;
+  align-items: stretch; overflow: visible;
+  border-radius: 24px; border: 1px solid var(--rv-dock-edge); background: var(--rv-glass-chrome);
+  -webkit-backdrop-filter: var(--rv-glass-blur); backdrop-filter: var(--rv-glass-blur);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06), inset 0 1px 0 var(--rv-glass-hi);
 }
 .rv-app.is-narrow button.rv-tab {
-  flex-direction: column; gap: 3px; min-width: 0; height: 50px; padding: 5px 0 4px;
-  border-radius: var(--rv-radius); font-size: 10px; font-weight: 600; letter-spacing: 0; color: var(--rv-dim);
+  flex: 1 1 0; min-width: 0; min-height: 44px; height: auto; padding: 0 2px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  border-radius: 18px; background: transparent; box-shadow: none; color: var(--rv-dim);
+  font-size: 11px; font-weight: 600; line-height: 1.2; letter-spacing: 0;
+  transition: background-color 120ms ease-out, color 120ms ease-out;
 }
-.rv-app.is-narrow button.rv-tab .rv-icon { display: inline-flex; width: 22px; height: 22px; }
-.rv-app.is-narrow button.rv-tab .rv-icon svg { width: 22px; height: 22px; stroke-width: 1.75; }
-.rv-app.is-narrow button.rv-tab .rv-btn-label { display: block; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: clip; }
+.rv-app.is-narrow button.rv-tab .rv-icon { display: inline-flex; width: 20px; height: 20px; }
+.rv-app.is-narrow button.rv-tab .rv-icon svg { width: 20px; height: 20px; stroke-width: 2; }
+.rv-app.is-narrow button.rv-tab .rv-btn-label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Month, Plan and Priorities live behind More. */
+.rv-app.is-narrow button.rv-tab.rv-tab-more-item { display: none; }
+.rv-app.is-narrow button.rv-tab:active { background: var(--rv-fill-2); color: var(--rv-ink); }
+@media (hover: hover) {
+  .rv-app.is-narrow button.rv-tab:hover { background: var(--rv-fill); color: var(--rv-ink); }
+}
+/* The current page is Frost's raised glass capsule in full ink. */
 .rv-app.is-narrow button.rv-tab.is-active {
   color: var(--rv-ink); background: rgba(255, 255, 255, 0.78);
   box-shadow: inset 0 1px 0 #ffffff, 0 0 0 0.5px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.10);
 }
 .rv-app.is-narrow button.rv-tab.is-active .rv-icon svg { stroke-width: 2.25; }
 .theme-dark .rv-app.is-narrow button.rv-tab.is-active { background: rgba(255, 255, 255, 0.14); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14); }
-.rv-app.is-narrow .rv-main { padding-bottom: calc(58px + env(safe-area-inset-bottom, 0px)); }
+.rv-app.is-narrow .rv-main { padding-bottom: var(--rv-dock-clear); }
+
+/* More: a bottom sheet standing where the dock is (so it covers it), over a
+   dimmed page. It lives in the root, beside the dock, never in the scroller. */
+.rv-app.is-narrow .rv-sheet-wrap { position: absolute; z-index: 6; top: 0; right: 0; bottom: 0; left: 0; }
+.rv-app.is-narrow .rv-scrim { position: absolute; top: 0; right: 0; bottom: 0; left: 0; background: var(--rv-scrim); animation: rv-fade 160ms ease-out; }
+.rv-app.is-narrow .rv-sheet {
+  position: absolute; left: 0; right: 0; bottom: var(--rv-dock-bottom); margin: 0 auto;
+  width: min(380px, calc(100% - 24px)); max-height: calc(100% - var(--rv-dock-bottom) - 24px); overflow-y: auto;
+  padding: 10px; border-radius: 28px; border: 1px solid var(--rv-dock-edge);
+  background: var(--rv-glass-chrome); color: var(--rv-ink);
+  -webkit-backdrop-filter: var(--rv-glass-blur); backdrop-filter: var(--rv-glass-blur);
+  box-shadow: inset 0 1px 0 var(--rv-glass-hi), 0 16px 40px rgba(0, 0, 0, 0.25); animation: rv-sheet-in 180ms ease-out;
+}
+.rv-app.is-narrow .rv-sheet-h { margin: 0; padding: 12px 14px 8px; font-size: 14px; font-weight: 600; line-height: 1.2; letter-spacing: 0.01em; color: var(--rv-dim); }
+.rv-app.is-narrow .rv-sheet-list { display: flex; flex-direction: column; gap: 2px; }
+.rv-app.is-narrow button.rv-sheet-row {
+  appearance: none; border: 0; margin: 0; box-shadow: none; background: transparent; color: var(--rv-ink);
+  display: flex; align-items: center; gap: 14px; width: 100%; height: auto; min-height: 60px; padding: 0 12px;
+  border-radius: 18px; text-align: left; font: inherit; cursor: pointer;
+}
+.rv-app.is-narrow .rv-sheet-ico { flex: none; display: grid; place-items: center; width: 42px; height: 42px; border-radius: 50%; background: var(--rv-fill-2); color: var(--rv-ink); }
+.rv-app.is-narrow .rv-sheet-ico .rv-icon, .rv-app.is-narrow .rv-sheet-ico .rv-icon svg { width: 19px; height: 19px; stroke-width: 2; }
+.rv-app.is-narrow .rv-sheet-title { min-width: 0; font-size: 15.5px; font-weight: 500; line-height: 1.25; letter-spacing: -0.2px; color: var(--rv-ink); }
+.rv-app.is-narrow button.rv-sheet-row:active { background: var(--rv-fill-2); }
+@media (hover: hover) {
+  .rv-app.is-narrow button.rv-sheet-row:hover { background: var(--rv-fill); }
+}
+.rv-app.is-narrow button.rv-sheet-row.is-current { background: var(--rv-tint-soft); }
+.rv-app.is-narrow button.rv-sheet-row.is-current .rv-sheet-ico { background: var(--rv-tint); color: var(--rv-tint-ink); }
+.rv-app.is-narrow button.rv-sheet-row:focus-visible { outline-offset: -2px; }
+@keyframes rv-sheet-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes rv-fade { from { opacity: 0; } to { opacity: 1; } }
 
 /* ---- main ------------------------------------------------------------ */
 
@@ -500,7 +557,7 @@
   position: absolute; z-index: 5; left: 50%; bottom: 20px; transform: translate(-50%, 20px);
   opacity: 0; pointer-events: none; transition: opacity 0.2s, transform 0.2s;
 }
-.rv-app.is-narrow .rv-toast { bottom: calc(66px + env(safe-area-inset-bottom, 0px)); }
+.rv-app.is-narrow .rv-toast { bottom: calc(var(--rv-dock-bottom) + var(--rv-dock-h) + 12px); }
 .rv-app .rv-toast.is-on { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
 .rv-app .rv-toast-inner {
   display: flex; align-items: center; gap: 14px;
@@ -957,20 +1014,17 @@
 .rv-app button.rv-row-more,
 .rv-app button.rv-add,
 .rv-app button.rv-nav,
-.rv-app button.rv-gear,
-.rv-app.is-narrow button.rv-tab { position: relative; }
+.rv-app button.rv-gear { position: relative; }
 .rv-app button.rv-tick::after,
 .rv-app button.rv-row-more::after,
 .rv-app button.rv-add::after,
 .rv-app button.rv-nav::after,
-.rv-app button.rv-gear::after,
-.rv-app.is-narrow button.rv-tab::after { content: ''; position: absolute; }
+.rv-app button.rv-gear::after { content: ''; position: absolute; }
 .rv-app button.rv-tick::after { top: -9px; right: -9px; bottom: -9px; left: -9px; }       /* 26 -> 44 */
 .rv-app button.rv-row-more::after { top: -7px; right: -7px; bottom: -7px; left: -7px; }   /* 30 -> 44 */
 .rv-app button.rv-add::after { top: -8px; right: -8px; bottom: -8px; left: -8px; }       /* 28 -> 44 */
 .rv-app button.rv-nav::after,
 .rv-app button.rv-gear::after { top: -6px; right: -6px; bottom: -6px; left: -6px; }      /* 32 -> 44 */
-.rv-app.is-narrow button.rv-tab::after { top: 0; right: 0; bottom: 0; left: 0; }          /* already 50 tall */
 /* On a phone-narrow pane the List / One-at-a-time switch (28 tall) and the
    Week page's day dots (26 x 22) get the same treatment: a taller hit area
    that stays inside their row, so a thumb lands on them. */
