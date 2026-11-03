@@ -1,8 +1,8 @@
 'use strict';
 /* Ask AI on the plugin: which AI this device uses, its key, and ask().
 
-   Per device, never in the vault (keys must not ride iCloud to every
-   device, and the Mac and the phone want different AIs): the provider, each
+   Computers only (no AI on a phone or tablet). Per device, never in the
+   vault (a key must not ride iCloud to every device): the provider, each
    API key and each app path live in Obsidian's local storage for this vault
    on this device. Per vault, in data.json: the model name for each AI
    (settings.aiModels) and whether the button shows (settings.askAi). */
@@ -16,9 +16,15 @@ const CLI_TIMEOUT = 3 * 60 * 1000;
 
 /* No AI on mobile (Ruan, 3 Nov 2026): on a phone or tablet there is no Ask
    AI at all — null, so no button, no item menu entry, no key field, and
-   nothing leaves the device. Every caller already reads null as "off". */
+   nothing leaves the device. Every caller already reads null as "off".
+   ask() below is the ONLY caller of providers.ask (tests/ai-host.test.cjs
+   pins that), and it refuses again at call time, so even if mobile turns on
+   after load (a phone-sized emulation) no request is made. */
+const mobile = () => !!(Platform && Platform.isMobile);
+const OFF = 'Ask AI is for your computer. It is off on phones and tablets.';
+
 function attachAi(plugin) {
-  if (Platform && Platform.isMobile) return null;
+  if (mobile()) return null;
   const app = plugin.app;
   let runner;
   const getRunner = () => (runner === undefined ? (runner = makeRunner()) : runner);
@@ -69,6 +75,7 @@ function attachAi(plugin) {
     },
     /* system: the rules + page; messages: the chat so far. */
     ask({ system, messages }) {
+      if (mobile()) return Promise.reject(new Error(OFF));
       const p = P.provider(device.provider());
       const r = p.kind === 'cli' ? getRunner() : null;
       return P.ask({
@@ -81,6 +88,7 @@ function attachAi(plugin) {
       });
     },
     async check(id) {
+      if (mobile()) throw new Error(OFF);
       const p = P.provider(id);
       const r = getRunner();
       if (!r || p.kind !== 'cli') throw new Error('Only on a computer.');

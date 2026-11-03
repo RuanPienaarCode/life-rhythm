@@ -261,9 +261,10 @@ class RhythmSettingTab extends PluginSettingTab {
     containerEl.createEl('p', { text: `Rhythm ${(this.plugin.manifest && this.plugin.manifest.version) || ''} · build ${BUILD}`, cls: 'setting-item-description' });
   }
 
-  /* Ask AI. Which AI and its key belong to THIS device (kept out of the
-     vault, so a key never syncs and the Mac can use Claude Code while the
-     phone uses a key); the model name is kept per AI in data.json. */
+  /* Ask AI (computers only: plugin.ai is null on a phone or tablet, which
+     gets one line saying so and no controls). Which AI and its key belong to
+     THIS device (kept out of the vault, so a key never syncs); the model
+     name is kept per AI in data.json. */
   askAiSection(containerEl, save) {
     const ai = this.plugin.ai;
     if (!ai) {
@@ -282,9 +283,7 @@ class RhythmSettingTab extends PluginSettingTab {
     const cur = ai.current();
     new Setting(containerEl)
       .setName('AI on this device')
-      .setDesc(ai.device.desktop
-        ? 'Claude Code and Codex use the plan you are signed in to on this computer. Claude, ChatGPT, Grok and Gemini use an API key from their own site, billed to that key. Claude Code can only answer; Codex cannot change anything, but it can read files on this computer while it answers.'
-        : 'Each uses an API key from its own site, billed to that key. Claude Code and Codex work on a computer only.')
+      .setDesc('Claude Code and Codex use the plan you are signed in to on this computer. Claude, ChatGPT, Grok and Gemini use an API key from their own site, billed to that key. Claude Code can only answer; Codex cannot change anything, but it can read files on this computer while it answers.')
       .addDropdown(d => {
         named(d.selectEl, 'AI on this device');
         for (const p of ai.providers()) d.addOption(p.id, p.kind === 'cli' ? `${p.name} (${p.plan} plan)` : p.name);
