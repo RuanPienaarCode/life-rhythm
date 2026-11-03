@@ -73,6 +73,11 @@ function rowMenu(ev, ctx, r, date) {
   menu.addItem(i => i.setTitle('Edit').setIcon('pencil').onClick(() => ctx.edit('practice', p)));
   menu.addItem(i => i.setTitle('Set aside').setIcon('archive').onClick(() => ctx.setAside(p, true)));
   menu.addItem(i => i.setTitle('Open note').setIcon('external-link').onClick(() => ctx.openNote(p.path)));
+  if (ctx.canAsk && ctx.canAsk()) {
+    menu.addSeparator();
+    menu.addItem(i => i.setTitle('Ask AI about this').setIcon('wand-2')
+      .onClick(() => ctx.askAbout({ kind: 'habit', text: p.name, details: [p.cadence, p.area].filter(Boolean).join(' · ') })));
+  }
   if (menu.showAtMouseEvent && ev && ev.clientX !== undefined) menu.showAtMouseEvent(ev);
   else if (menu.showAtPosition && ev && ev.target) { const b = ev.target.getBoundingClientRect(); menu.showAtPosition({ x: b.left, y: b.bottom }); }
 }
@@ -98,6 +103,8 @@ function practiceRow(list, ctx, r, date, opts) {
   if (bits.length) el(body, 'div', 'rv-row-meta', bits.join(' · '));
   const more = button(row, 'rv-row-more', null, e => rowMenu(e, ctx, r, date), 'ellipsis');
   more.setAttribute('aria-label', `More for ${p.name}`);
+  /* Right-click opens the same menu as (…). */
+  row.addEventListener('contextmenu', e => { e.preventDefault(); rowMenu(e, ctx, r, date); });
   return row;
 }
 

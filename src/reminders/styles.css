@@ -1,0 +1,662 @@
+/* ============================================================================
+   NUDGE — styles (build input; root styles.css is a copy of this file)
+
+   Direction: frosted glass over a slow field of colour, dark or light. Translucent panels
+   with a hairline edge and a lit top rim, white ink in three alpha steps, and
+   exactly one colour that carries meaning at a time — warm when something is
+   late, cool when it is merely coming. Nothing decorative competes with the
+   one thing the user opened this to see: what needs them now.
+
+   Host-cascade discipline (learned the hard way in Vista):
+     - the view root also carries Obsidian's .view-content (0,2,0), so root
+       overrides live on .workspace-leaf-content .view-content.nd-app.
+     - app.css's button:not(.clickable-icon) is (0,1,1) and beats a single
+       class — EVERY rule that styles a button carries a second ancestor.
+     - app.css restyles button:hover too; reset only its ground and shadow
+       there, never padding, or buttons lose their inset on hover.
+
+   iOS 15 floor: -webkit- prefixed backdrop-filter, no `inset` shorthand, no
+   container queries, no :has(). Mobile drops per-row blur — one blurred layer
+   per card is fine, forty is not.
+   ============================================================================ */
+
+.nd-app {
+  --nd-ink: #ffffff;
+  --nd-dim: rgba(255, 255, 255, 0.72);
+  --nd-faint: rgba(255, 255, 255, 0.54);
+  --nd-ghost: rgba(255, 255, 255, 0.28);
+  --nd-glass: rgba(255, 255, 255, 0.065);
+  --nd-glass-2: rgba(255, 255, 255, 0.11);
+  --nd-glass-3: rgba(255, 255, 255, 0.17);
+  --nd-line: rgba(255, 255, 255, 0.13);
+  --nd-line-2: rgba(255, 255, 255, 0.26);
+  --nd-shine: rgba(255, 255, 255, 0.11);
+  --nd-shadow: 0 14px 44px rgba(0, 0, 0, 0.34);
+  --nd-ground: #0a0c12;
+  --nd-late: #ff8f7a;
+  --nd-late-soft: rgba(255, 143, 122, 0.16);
+  --nd-warn: #ffc978;
+  --nd-ok: #7fe3b0;
+  --nd-accent: #9fd0ff;
+  /* Colours the light look has to re-spell, so no rule hard-codes them. */
+  --nd-late-line: rgba(255, 143, 122, 0.34);
+  --nd-late-rim: rgba(255, 143, 122, 0.26);
+  --nd-late-ring: rgba(255, 143, 122, 0.6);
+  --nd-ok-ink: #06120c;
+  --nd-go-hover: rgba(255, 255, 255, 0.24);
+  --nd-lift: 0 2px 26px rgba(0, 0, 0, 0.34);
+  --nd-veil: linear-gradient(180deg, rgba(6, 8, 14, 0.42) 0%, rgba(6, 8, 14, 0.68) 100%);
+  --nd-bg-strength: 0.36;
+  --nd-solid: rgba(22, 26, 38, 0.52);
+  --nd-solid-late: rgba(62, 30, 32, 0.62);
+  --nd-solid-done: rgba(22, 26, 38, 0.34);
+  --nd-side-solid: rgba(14, 16, 24, 0.9);
+  --nd-scrim: rgba(0, 0, 0, 0.42);
+  --nd-radius: 20px;
+  --nd-radius-s: 14px;
+  --nd-blur: 22px;
+  --nd-font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Segoe UI', Roboto, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+
+  color-scheme: dark;
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  background: var(--nd-ground);
+  color: var(--nd-ink);
+  font-family: var(--nd-font);
+  font-size: 15px;
+  line-height: 1.35;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Tints: the light behind the glass. Three soft sources, nothing sharp. */
+.nd-app[data-tint="aurora"] { --nd-a: #2b6cff; --nd-b: #a24bff; --nd-c: #12b8a6; --nd-accent: #9fd0ff; --nd-ground: #080a12; }
+.nd-app[data-tint="dusk"]   { --nd-a: #ff5f7e; --nd-b: #7b3fe4; --nd-c: #ff9d4d; --nd-accent: #ffb3c4; --nd-ground: #0d0810; }
+.nd-app[data-tint="moss"]   { --nd-a: #1f9e6b; --nd-b: #0e7490; --nd-c: #8bbf3f; --nd-accent: #a7e8c4; --nd-ground: #06100d; }
+.nd-app[data-tint="ember"]  { --nd-a: #ff7a29; --nd-b: #c2410c; --nd-c: #facc15; --nd-accent: #ffcf9e; --nd-ground: #100904; }
+.nd-app[data-tint="ink"]    { --nd-a: #4b5b76; --nd-b: #2b3550; --nd-c: #6b7a99; --nd-accent: #c7d4ea; --nd-ground: #080a0e; }
+
+/* Light glass: the same recipe inverted — frosted white panels over a pale
+   wash, ink in three dark alpha steps, and the warm/cool meaning colours
+   deepened until they hold contrast on white. Declared after the tints (same
+   weight) so its accent wins; the tint keeps only the light behind. */
+.nd-app.is-light {
+  --nd-ink: #14161c;
+  --nd-dim: rgba(20, 22, 28, 0.72);
+  --nd-faint: rgba(20, 22, 28, 0.64);
+  --nd-ghost: rgba(20, 22, 28, 0.34);
+  --nd-glass: rgba(255, 255, 255, 0.52);
+  --nd-glass-2: rgba(255, 255, 255, 0.72);
+  --nd-glass-3: rgba(255, 255, 255, 0.9);
+  --nd-line: rgba(20, 22, 28, 0.09);
+  --nd-line-2: rgba(20, 22, 28, 0.2);
+  --nd-shine: rgba(255, 255, 255, 0.85);
+  --nd-shadow: 0 10px 34px rgba(30, 36, 60, 0.1);
+  --nd-ground: #f3f2f7;
+  --nd-late: #b8321c;
+  --nd-late-soft: rgba(230, 90, 60, 0.11);
+  --nd-late-line: rgba(199, 58, 34, 0.3);
+  --nd-late-rim: rgba(199, 58, 34, 0.22);
+  --nd-late-ring: rgba(199, 58, 34, 0.55);
+  --nd-warn: #c98100;
+  --nd-ok: #14774a;
+  --nd-ok-ink: #ffffff;
+  --nd-accent: #2563c9;
+  --nd-go-hover: #ffffff;
+  --nd-lift: none;
+  --nd-veil: linear-gradient(180deg, rgba(248, 248, 252, 0.34) 0%, rgba(248, 248, 252, 0.6) 100%);
+  --nd-bg-strength: 0.42;
+  --nd-solid: rgba(255, 255, 255, 0.7);
+  --nd-solid-late: rgba(253, 234, 229, 0.9);
+  --nd-solid-done: rgba(255, 255, 255, 0.45);
+  --nd-side-solid: rgba(250, 250, 253, 0.94);
+  --nd-scrim: rgba(30, 34, 50, 0.18);
+  color-scheme: light;
+}
+.nd-app.is-light:not(.is-plain)[data-tint="aurora"] { --nd-accent: #2563c9; }
+.nd-app.is-light:not(.is-plain)[data-tint="dusk"]   { --nd-accent: #b8325a; --nd-ground: #f7f1f4; }
+.nd-app.is-light:not(.is-plain)[data-tint="moss"]   { --nd-accent: #13795b; --nd-ground: #eff5f2; }
+.nd-app.is-light:not(.is-plain)[data-tint="ember"]  { --nd-accent: #b4520f; --nd-ground: #f8f2ec; }
+.nd-app.is-light:not(.is-plain)[data-tint="ink"]    { --nd-accent: #3d5078; --nd-ground: #f1f2f5; }
+
+/* Plain: borrow the theme instead of bringing our own ground. */
+.nd-app.is-plain {
+  --nd-ink: var(--text-normal);
+  --nd-dim: var(--text-muted);
+  --nd-faint: var(--text-faint);
+  --nd-ghost: var(--text-faint);
+  --nd-glass: var(--background-secondary);
+  --nd-glass-2: var(--background-modifier-hover);
+  --nd-glass-3: var(--background-modifier-active-hover);
+  --nd-line: var(--background-modifier-border);
+  --nd-line-2: var(--background-modifier-border-hover);
+  --nd-shine: transparent;
+  --nd-shadow: 0 6px 22px rgba(0, 0, 0, 0.08);
+  --nd-ground: var(--background-primary);
+  --nd-accent: var(--text-accent);
+  --nd-late: #d9534f;
+  --nd-late-soft: rgba(217, 83, 79, 0.12);
+  --nd-late-line: rgba(217, 83, 79, 0.34);
+  --nd-late-rim: rgba(217, 83, 79, 0.26);
+  --nd-late-ring: rgba(217, 83, 79, 0.6);
+  --nd-go-hover: var(--background-modifier-active-hover);
+  --nd-lift: none;
+  --nd-side-solid: var(--background-secondary);
+}
+.nd-app.is-plain .nd-bg, .nd-app.is-plain .nd-veil { display: none; }
+
+.workspace-leaf-content .view-content.nd-app { padding: 0; overflow: hidden; background: var(--nd-ground); color: var(--nd-ink); }
+/* Fill the leaf, not the viewport. Obsidian's leaf content is a flex column and
+   on a phone pushes .view-content down with margin-top (--view-top-spacing),
+   so height:100% overflows by exactly that margin. A flex item with
+   flex-basis 0 ignores its height entirely and takes what is left; the
+   height:100% stays only as the fallback for a parent that is not a flex
+   column (the browser preview). */
+.workspace-leaf-content .view-content.nd-app { height: 100%; flex: 1 1 0; min-height: 0; }
+
+.nd-app * { box-sizing: border-box; }
+/* Wins on specificity, with no forcing flag: the second selector is (0,3,0), above
+   every display rule on an element that carries is-hidden (.nd-tags,
+   .nd-list-head — both (0,2,0) — are the ones board.js toggles). */
+.nd-app .is-hidden,
+.nd-app .nd-page .is-hidden { display: none; }
+.nd-app .nd-spacer { flex: 1 1 auto; }
+.nd-app .nd-icon { display: inline-flex; width: 17px; height: 17px; align-items: center; justify-content: center; flex: none; }
+.nd-app .nd-icon svg { width: 17px; height: 17px; display: block; }
+
+/* Button reset. (0,2,1) so it beats app.css's button:not(.clickable-icon)
+   whatever the load order; every button class below therefore carries a
+   second ancestor of its own. */
+.nd-app .nd-page button,
+.nd-app .nd-side button,
+.nd-modal-shell .nd-modal button {
+  background: transparent; box-shadow: none; border: 0; padding: 0; margin: 0;
+  height: auto; font: inherit; color: inherit; cursor: pointer;
+  -webkit-appearance: none; appearance: none; text-align: left;
+}
+.nd-app .nd-page button:hover,
+.nd-app .nd-side button:hover,
+.nd-modal-shell .nd-modal button:hover { background: transparent; box-shadow: none; }
+.nd-app .nd-page button:focus-visible,
+.nd-app .nd-side button:focus-visible,
+.nd-modal-shell .nd-modal button:focus-visible { outline: 2px solid var(--nd-accent); outline-offset: 2px; border-radius: 8px; }
+
+/* ---- layers --------------------------------------------------------------- */
+
+.nd-app .nd-bg {
+  position: absolute; top: -20%; left: -20%; right: -20%; bottom: -20%;
+  pointer-events: none;
+  background:
+    radial-gradient(42% 38% at 18% 22%, var(--nd-a) 0%, transparent 68%),
+    radial-gradient(38% 34% at 82% 14%, var(--nd-b) 0%, transparent 66%),
+    radial-gradient(46% 42% at 62% 88%, var(--nd-c) 0%, transparent 70%);
+  opacity: var(--nd-bg-strength);
+  filter: blur(30px);
+  animation: nd-drift 48s ease-in-out infinite alternate;
+  will-change: transform;
+}
+@keyframes nd-drift {
+  0%   { transform: translate3d(0, 0, 0) scale(1); }
+  50%  { transform: translate3d(2.5%, -2%, 0) scale(1.06); }
+  100% { transform: translate3d(-2%, 2.5%, 0) scale(1.02); }
+}
+.nd-app .nd-veil {
+  position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none;
+  background: var(--nd-veil);
+}
+.nd-app .nd-shell { position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; }
+.nd-app .nd-scroll { position: relative; flex: 1 1 auto; min-width: 0; height: 100%; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
+.nd-app .nd-page { position: relative; max-width: 860px; margin: 0 auto; padding: 42px 26px 56px; display: flex; flex-direction: column; gap: 18px; }
+
+/* The one glass recipe, used by every surface. */
+.nd-app .nd-glass,
+.nd-app .nd-page .nd-row,
+.nd-app .nd-page .nd-chip,
+.nd-app .nd-page .nd-tag {
+  background: var(--nd-glass);
+  -webkit-backdrop-filter: blur(var(--nd-blur)) saturate(165%);
+  backdrop-filter: blur(var(--nd-blur)) saturate(165%);
+  border: 1px solid var(--nd-line);
+  box-shadow: var(--nd-shadow), inset 0 1px 0 var(--nd-shine);
+}
+
+/* ---- sidebar -------------------------------------------------------------- */
+/* Beside the board on a wide pane (.has-side); a drawer over it on a narrow
+   one (.is-narrow, opened by .is-drawer). Hidden otherwise. */
+
+.nd-app .nd-side {
+  display: none; flex: 0 0 240px; height: 100%; overflow-y: auto; overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  flex-direction: column; gap: 2px; padding: 38px 12px 24px;
+  background: var(--nd-glass);
+  -webkit-backdrop-filter: blur(var(--nd-blur)) saturate(165%);
+  backdrop-filter: blur(var(--nd-blur)) saturate(165%);
+  border-right: 1px solid var(--nd-line);
+  box-shadow: inset -1px 0 0 var(--nd-shine);
+}
+.nd-app.has-side .nd-side { display: flex; }
+/* The sidebar carries the views; the chips would only repeat them. */
+.nd-app.has-side .nd-chips { display: none; }
+.nd-app.has-side .nd-bar { justify-content: flex-end; }
+
+.nd-app .nd-scrim { display: none; }
+.nd-app.is-narrow .nd-side {
+  display: flex; position: absolute; top: 0; bottom: 0; left: 0; z-index: 3;
+  width: 280px; max-width: 84%; padding-top: 26px;
+  background: var(--nd-side-solid); box-shadow: 0 0 48px rgba(0, 0, 0, 0.28);
+  -webkit-transform: translate3d(-105%, 0, 0); transform: translate3d(-105%, 0, 0);
+  transition: transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  visibility: hidden;
+}
+.nd-app.is-narrow.is-drawer .nd-side { -webkit-transform: none; transform: none; visibility: visible; }
+.nd-app.is-narrow.is-drawer .nd-scrim {
+  display: block; position: absolute; top: 0; left: 0; right: 0; bottom: 0; z-index: 2; background: var(--nd-scrim);
+}
+
+.nd-app .nd-side-group { display: flex; flex-direction: column; gap: 2px; }
+.nd-app .nd-side-label {
+  padding: 18px 10px 6px; font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.1em; color: var(--nd-faint);
+}
+.nd-app .nd-side button.nd-side-item {
+  display: flex; align-items: center; justify-content: flex-start; gap: 10px; width: 100%;
+  padding: 8px 10px; border-radius: 11px; font-size: 14px; color: var(--nd-dim);
+  border: 1px solid transparent; white-space: nowrap;
+  transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
+}
+.nd-app .nd-side button.nd-side-item .nd-icon { color: var(--nd-faint); transition: color 140ms ease; }
+.nd-app .nd-side button.nd-side-item .nd-btn-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+.nd-app .nd-side button.nd-side-item:hover { background: var(--nd-glass-2); color: var(--nd-ink); }
+.nd-app .nd-side button.nd-side-item.is-on {
+  background: var(--nd-glass-3); border-color: var(--nd-line); color: var(--nd-ink); font-weight: 600;
+  box-shadow: inset 0 1px 0 var(--nd-shine);
+}
+.nd-app .nd-side button.nd-side-item.is-on .nd-icon { color: var(--nd-accent); }
+.nd-app .nd-side-n { flex: none; font-size: 12px; color: var(--nd-faint); font-variant-numeric: tabular-nums; font-weight: 500; }
+.nd-app .nd-side button.nd-side-add { margin-top: 8px; color: var(--nd-faint); }
+
+.nd-app .nd-side-new {
+  display: flex; align-items: center; gap: 10px; margin-top: 8px; padding: 4px 10px;
+  border-radius: 11px; background: var(--nd-glass-2); border: 1px solid var(--nd-line-2); color: var(--nd-faint);
+}
+.nd-app .nd-side-new input[type="text"].nd-side-input {
+  flex: 1 1 auto; min-width: 0; height: 30px; padding: 0; background: transparent; border: 0;
+  box-shadow: none; border-radius: 0; outline: none; color: var(--nd-ink); font: inherit; font-size: 14px;
+}
+.nd-app .nd-side-input::placeholder { color: var(--nd-faint); }
+
+.nd-app .nd-head-line { display: flex; align-items: center; gap: 10px; }
+.nd-app .nd-page button.nd-side-toggle {
+  flex: none; display: inline-flex; padding: 7px; border-radius: 10px; color: var(--nd-faint);
+  transition: background 140ms ease, color 140ms ease;
+}
+.nd-app .nd-page button.nd-side-toggle:hover { background: var(--nd-glass-2); color: var(--nd-ink); }
+.nd-app .nd-page button.nd-side-toggle .nd-icon, .nd-app .nd-page button.nd-side-toggle .nd-icon svg { width: 19px; height: 19px; }
+
+.nd-app .nd-list-head { display: flex; align-items: center; gap: 10px; padding: 6px 4px 0; }
+.nd-app .nd-list-head-icon { color: var(--nd-accent); }
+.nd-app .nd-list-head-icon, .nd-app .nd-list-head-icon svg { width: 20px; height: 20px; }
+.nd-app .nd-list-title {
+  margin: 0; font-size: 21px; font-weight: 600; letter-spacing: -0.015em;
+  /* A theme's h2 rules (font, colour, style) must not reach the board. */
+  color: var(--nd-ink); font-family: var(--nd-font); font-style: normal; font-variant: normal; text-transform: none;
+}
+.nd-app .nd-page button.nd-list-clear {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px;
+  border-radius: 999px; font-size: 12.5px; color: var(--nd-faint);
+}
+.nd-app .nd-page button.nd-list-clear:hover { background: var(--nd-glass-2); color: var(--nd-ink); }
+.nd-app .nd-page button.nd-list-clear .nd-icon, .nd-app .nd-page button.nd-list-clear .nd-icon svg { width: 13px; height: 13px; }
+
+/* ---- header --------------------------------------------------------------- */
+
+.nd-app .nd-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; padding: 0 4px 2px; }
+.nd-app .nd-greet {
+  margin: 0; font-size: 32px; font-weight: 600; letter-spacing: -0.022em; line-height: 1.1; text-shadow: var(--nd-lift);
+  /* A theme's h1 rules (font, colour, style) must not reach the board. */
+  color: var(--nd-ink); font-family: var(--nd-font); font-style: normal; font-variant: normal; text-transform: none;
+}
+.nd-app .nd-sub { margin-top: 7px; font-size: 14px; color: var(--nd-dim); }
+.nd-app .nd-head-right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.nd-app .nd-date { font-size: 12.5px; color: var(--nd-faint); letter-spacing: 0.02em; }
+
+.nd-app .nd-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border-radius: 999px; font-size: 12.5px; line-height: 1.2;
+  background: var(--nd-glass-2); border: 1px solid var(--nd-line); color: var(--nd-dim);
+  white-space: nowrap; max-width: 100%; min-width: 0; overflow: hidden;
+}
+/* A long tag or list name ends in an ellipsis instead of pushing the row wider.
+   Pills that wrap an icon + label ellipsise the label span; the ones that are
+   bare text become a block so text-overflow applies to them directly. */
+.nd-app .nd-pill > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.nd-app .nd-pill.nd-group, .nd-app .nd-pill.nd-tagpill { display: block; text-overflow: ellipsis; }
+.nd-app .nd-pill .nd-icon, .nd-app .nd-pill .nd-icon svg { width: 13px; height: 13px; }
+.nd-app .nd-pill-count { padding: 6px 13px; font-size: 13px; font-weight: 600; color: var(--nd-ink); }
+.nd-app .nd-pill-count.is-late { background: var(--nd-late-soft); border-color: var(--nd-late-line); color: var(--nd-late); }
+.nd-app .nd-pill-count.is-due { border-color: var(--nd-line-2); }
+.nd-app .nd-pill-count.is-clear { color: var(--nd-faint); font-weight: 500; }
+
+/* ---- quick add ------------------------------------------------------------ */
+
+.nd-app .nd-add {
+  position: relative; display: flex; align-items: center; gap: 10px;
+  padding: 4px 6px 4px 14px; border-radius: var(--nd-radius); min-height: 54px;
+}
+.nd-app .nd-add-icon { color: var(--nd-faint); }
+.nd-app .nd-add-input {
+  flex: 1 1 auto; min-width: 0; background: transparent; border: 0; box-shadow: none; outline: none;
+  color: var(--nd-ink); font: inherit; font-size: 15.5px; padding: 10px 0; height: auto;
+}
+/* app.css styles input[type=text] directly; reclaim it. */
+.nd-app .nd-add input[type="text"].nd-add-input,
+.nd-app .nd-search input[type="text"].nd-search-input {
+  background: transparent; border: 0; box-shadow: none; border-radius: 0;
+}
+.nd-app .nd-add-input::placeholder { color: var(--nd-faint); }
+.nd-app .nd-page button.nd-add-go {
+  flex: none; padding: 9px 16px; border-radius: 12px; font-size: 14px; font-weight: 600;
+  background: var(--nd-glass-3); border: 1px solid var(--nd-line-2); color: var(--nd-ink);
+  transition: background 140ms ease, transform 140ms ease;
+}
+.nd-app .nd-page button.nd-add-go:hover { background: var(--nd-go-hover); transform: translateY(-1px); }
+.nd-app .nd-add-hint {
+  position: absolute; left: 41px; right: 96px; bottom: -19px; display: none; gap: 6px;
+  font-size: 11.5px; color: var(--nd-faint); pointer-events: none;
+}
+.nd-app .nd-add-hint.is-on { display: flex; flex-wrap: wrap; }
+.nd-app .nd-hint-bit { padding: 1px 7px; border-radius: 999px; background: var(--nd-glass-2); border: 1px solid var(--nd-line); }
+
+/* ---- filter bar ----------------------------------------------------------- */
+
+.nd-app .nd-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
+.nd-app .nd-chips { display: flex; gap: 7px; flex-wrap: wrap; flex: 1 1 auto; }
+.nd-app .nd-page button.nd-chip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px;
+  font-size: 13px; color: var(--nd-dim); transition: color 140ms ease, background 140ms ease, border-color 140ms ease;
+}
+.nd-app .nd-page button.nd-chip .nd-icon, .nd-app .nd-page button.nd-chip .nd-icon svg { width: 14px; height: 14px; }
+.nd-app .nd-page button.nd-chip:hover { color: var(--nd-ink); background: var(--nd-glass-2); }
+.nd-app .nd-page button.nd-chip.is-on { color: var(--nd-ground); background: var(--nd-ink); border-color: transparent; font-weight: 600; }
+.nd-app.is-plain .nd-page button.nd-chip.is-on { color: var(--background-primary); }
+.nd-app .nd-chip-n { font-size: 11px; opacity: 0.62; font-variant-numeric: tabular-nums; }
+
+.nd-app .nd-search { display: flex; align-items: center; gap: 8px; padding: 0 8px 0 12px; border-radius: 999px; height: 36px; min-width: 200px; }
+.nd-app .nd-search-icon { color: var(--nd-faint); }
+.nd-app .nd-search-input { flex: 1 1 auto; min-width: 0; background: transparent; border: 0; outline: none; color: var(--nd-ink); font: inherit; font-size: 13.5px; height: 34px; }
+.nd-app .nd-search-input::placeholder { color: var(--nd-faint); }
+.nd-app .nd-page button.nd-search-clear { display: inline-flex; padding: 5px; border-radius: 999px; color: var(--nd-faint); }
+.nd-app .nd-page button.nd-search-clear:hover { background: var(--nd-glass-2); color: var(--nd-ink); }
+
+/* The inputs drop their own outline (the glass pill is the field), so the pill
+   carries the focus cue. A ring in box-shadow follows the pill's radius on iOS
+   15, which an outline does not; the glass recipe's own shadows are kept. */
+.nd-app .nd-add:focus-within,
+.nd-app .nd-search:focus-within {
+  box-shadow: var(--nd-shadow), inset 0 1px 0 var(--nd-shine), 0 0 0 2px var(--nd-accent);
+}
+.nd-app .nd-side-new:focus-within { box-shadow: 0 0 0 2px var(--nd-accent); }
+
+.nd-app .nd-tags { display: flex; gap: 6px; flex-wrap: wrap; padding: 0 2px; }
+.nd-app .nd-page button.nd-tag { display: inline-flex; align-items: center; max-width: 100%; padding: 3px 10px; border-radius: 999px; font-size: 12px; color: var(--nd-faint); }
+.nd-app .nd-page button.nd-tag .nd-btn-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nd-app .nd-page button.nd-tag:hover { color: var(--nd-ink); }
+.nd-app .nd-page button.nd-tag.is-on { color: var(--nd-accent); border-color: var(--nd-accent); }
+
+/* ---- the list ------------------------------------------------------------- */
+
+.nd-app .nd-list { display: flex; flex-direction: column; gap: 24px; margin-top: 4px; }
+.nd-app .nd-sec { display: flex; flex-direction: column; gap: 8px; }
+.nd-app .nd-sec-head { display: flex; align-items: baseline; gap: 8px; padding: 0 6px 2px; }
+.nd-app .nd-sec-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--nd-faint); }
+.nd-app .nd-sec-n { font-size: 11.5px; color: var(--nd-faint); font-variant-numeric: tabular-nums; }
+.nd-app .nd-rows { display: flex; flex-direction: column; gap: 8px; }
+
+.nd-app .nd-row {
+  position: relative; display: flex; align-items: flex-start; gap: 12px;
+  padding: 13px 12px 13px 16px; border-radius: var(--nd-radius-s); overflow: hidden;
+  transition: transform 160ms ease, background 160ms ease, border-color 160ms ease, opacity 220ms ease;
+  animation: nd-rise 320ms ease both;
+}
+@keyframes nd-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+/* Hover effects only where there is a hover: on iOS a tap leaves :hover
+   stuck, so the row would stay lifted. */
+@media (hover: hover) {
+  .nd-app .nd-row:hover { background: var(--nd-glass-2); border-color: var(--nd-line-2); transform: translateY(-1px); }
+}
+
+/* Priority is a rim of light on the leading edge, not a badge to read. */
+.nd-app .nd-row::before {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  background: transparent; transition: background 160ms ease;
+}
+.nd-app .nd-row[data-priority="highest"]::before { background: var(--nd-late); }
+.nd-app .nd-row[data-priority="high"]::before { background: var(--nd-warn); }
+.nd-app .nd-row[data-priority="medium"]::before { background: var(--nd-accent); }
+.nd-app .nd-row[data-priority="low"]::before,
+.nd-app .nd-row[data-priority="lowest"]::before { background: var(--nd-ghost); }
+.nd-app .nd-row.is-late { background: var(--nd-late-soft); border-color: var(--nd-late-rim); }
+/* Done is shown by the tick, the strikethrough and a dimmed rim - never by
+   fading the row, which took the text under 2:1. */
+.nd-app .nd-row.is-done::before { opacity: 0.4; }
+.nd-app .nd-row.is-ticking { opacity: 0.35; transform: scale(0.995); }
+/* While a tick is being written the row ignores further taps; text keeps its colour. */
+.nd-app .nd-row[aria-busy="true"] { pointer-events: none; }
+
+.nd-app .nd-page button.nd-check {
+  flex: none; width: 22px; height: 22px; margin-top: 1px; border-radius: 50%;
+  border: 1.6px solid var(--nd-line-2); display: inline-flex; align-items: center; justify-content: center;
+  color: transparent; transition: background 160ms ease, border-color 160ms ease, color 160ms ease, transform 160ms ease;
+}
+@media (hover: hover) {
+  .nd-app .nd-page button.nd-check:hover { border-color: var(--nd-ink); transform: scale(1.08); }
+}
+.nd-app .nd-page button.nd-check .nd-icon, .nd-app .nd-page button.nd-check .nd-icon svg { width: 13px; height: 13px; }
+.nd-app .nd-row.is-done .nd-page button.nd-check,
+.nd-app .nd-page .nd-row.is-done button.nd-check { background: var(--nd-ok); border-color: var(--nd-ok); color: var(--nd-ok-ink); }
+.nd-app .nd-page .nd-row.is-late button.nd-check { border-color: var(--nd-late-ring); }
+
+.nd-app .nd-row-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 7px; }
+.nd-app .nd-page button.nd-row-title {
+  font-size: 15px; line-height: 1.34; color: var(--nd-ink); word-break: break-word;
+  padding: 0; border-radius: 4px; transition: color 140ms ease;
+  /* app.css makes every button a centred flex box; a title reads from the
+     left, wraps, and spans the row. */
+  display: block; width: 100%; text-align: left; justify-content: flex-start; white-space: normal;
+}
+.nd-app .nd-page button.nd-row-title:hover { color: var(--nd-accent); }
+.nd-app .nd-page button.nd-row-title.is-done { text-decoration: line-through; color: var(--nd-dim); }
+.nd-app .nd-row-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.nd-app .nd-due.is-late { background: var(--nd-late-soft); border-color: var(--nd-late-line); color: var(--nd-late); }
+.nd-app .nd-due.is-today { color: var(--nd-ink); border-color: var(--nd-line-2); }
+/* "3 days late" repeats "3 days ago" in other words. It earns its place
+   beside it on a wide row; on a phone row the meta column is ~140px, and
+   the two would ellipsise each other into "3 day… 3 day…". No opacity:
+   late text on its soft ground is already at the 4.5:1 floor. */
+.nd-app .nd-late-n { font-weight: 400; }
+.nd-app.is-narrow .nd-late-n { display: none; }
+.nd-app .nd-tagpill { color: var(--nd-accent); background: transparent; }
+.nd-app .nd-group { color: var(--nd-faint); background: transparent; }
+.nd-app .nd-donepill { color: var(--nd-ok); background: transparent; border-color: transparent; }
+
+.nd-app .nd-row-acts { display: flex; align-items: center; gap: 2px; flex: none; opacity: 0; transition: opacity 140ms ease; }
+.nd-app .nd-row:hover .nd-row-acts, .nd-app .nd-row:focus-within .nd-row-acts { opacity: 1; }
+.nd-app .nd-page button.nd-act { padding: 7px; border-radius: 9px; color: var(--nd-faint); }
+.nd-app .nd-page button.nd-act:hover { background: var(--nd-glass-3); color: var(--nd-ink); }
+
+/* ---- empty + footer ------------------------------------------------------- */
+
+.nd-app .nd-empty {
+  display: flex; flex-direction: column; align-items: center; gap: 7px;
+  padding: 46px 26px; border-radius: var(--nd-radius); text-align: center;
+}
+.nd-app .nd-empty-icon { color: var(--nd-ghost); }
+.nd-app .nd-empty-icon .nd-icon, .nd-app .nd-empty-icon svg { width: 26px; height: 26px; }
+.nd-app .nd-empty-title { font-size: 16px; font-weight: 600; }
+.nd-app .nd-empty-sub { font-size: 13.5px; color: var(--nd-faint); max-width: 42ch; }
+
+.nd-app .nd-foot { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 6px 6px 0; margin-top: 8px; border-top: 1px solid var(--nd-line); padding-top: 16px; }
+.nd-app .nd-page button.nd-link { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--nd-faint); padding: 5px 8px; border-radius: 8px; }
+.nd-app .nd-page button.nd-link:hover { color: var(--nd-ink); background: var(--nd-glass-2); }
+.nd-app .nd-page button.nd-link .nd-icon, .nd-app .nd-page button.nd-link .nd-icon svg { width: 13px; height: 13px; }
+/* "Show all N" inside the Done header: it also carries nd-link, so this
+   (0,3,1) rule, declared after it, turns the footer-link look into a small
+   underlined inline link pushed to the header's right edge. dim, not faint,
+   because it is text on the page ground. */
+.nd-app .nd-page button.nd-sec-more { margin-left: auto; padding: 0 4px; font-size: 12px; color: var(--nd-dim); text-decoration: underline; border-radius: 6px; }
+.nd-app .nd-page button.nd-sec-more:hover { color: var(--nd-ink); background: transparent; }
+.nd-app .nd-foot-note { margin-left: auto; font-size: 11.5px; color: var(--nd-faint); }
+
+/* ---- the editor ----------------------------------------------------------- */
+
+.nd-modal-shell .nd-modal { font-family: var(--nd-font); }
+.nd-modal .nd-modal-title { font-size: 19px; font-weight: 600; margin-bottom: 16px; }
+.nd-modal .nd-form { display: flex; flex-direction: column; gap: 14px; }
+.nd-modal .nd-field { display: flex; flex-direction: column; gap: 6px; }
+.nd-modal .nd-label { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.09em; color: var(--text-muted); }
+.nd-modal .nd-field-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.nd-modal .nd-in {
+  flex: 1 1 160px; min-width: 0; padding: 9px 12px; border-radius: 10px; font: inherit; font-size: 14px;
+  background: var(--background-modifier-form-field, var(--background-secondary));
+  border: 1px solid var(--background-modifier-border); color: var(--text-normal);
+}
+.nd-modal .nd-in-title { font-size: 15.5px; flex-basis: 100%; }
+.nd-modal .nd-in-date, .nd-modal .nd-in-time { flex: 0 0 auto; }
+.nd-modal .nd-quickdates { display: flex; gap: 6px; flex-wrap: wrap; }
+.nd-modal-shell .nd-modal button.nd-quickdate {
+  padding: 5px 11px; border-radius: 999px; font-size: 12.5px; color: var(--text-muted);
+  border: 1px solid var(--background-modifier-border);
+}
+.nd-modal-shell .nd-modal button.nd-quickdate:hover { background: var(--background-modifier-hover); color: var(--text-normal); }
+.nd-modal .nd-when-note { font-size: 12.5px; color: var(--text-muted); padding: 2px 2px 0; }
+.nd-modal .nd-when-note.is-warn { color: var(--text-error, #d9534f); }
+.nd-modal .nd-seg { display: flex; gap: 4px; flex-wrap: wrap; }
+.nd-modal-shell .nd-modal button.nd-seg-b {
+  padding: 6px 11px; border-radius: 9px; font-size: 12.5px; color: var(--text-muted);
+  border: 1px solid var(--background-modifier-border);
+}
+.nd-modal-shell .nd-modal button.nd-seg-b:hover { background: var(--background-modifier-hover); }
+.nd-modal-shell .nd-modal button.nd-seg-b.is-on { background: var(--interactive-accent); color: var(--text-on-accent); border-color: transparent; font-weight: 600; }
+.nd-modal .nd-modal-foot { display: flex; align-items: center; gap: 8px; margin-top: 22px; }
+.nd-modal-shell .nd-modal button.nd-btn {
+  display: inline-flex; align-items: center; gap: 6px; padding: 8px 15px; border-radius: 10px; font-size: 14px;
+  border: 1px solid var(--background-modifier-border); color: var(--text-normal);
+}
+.nd-modal-shell .nd-modal button.nd-btn:hover { background: var(--background-modifier-hover); }
+.nd-modal-shell .nd-modal button.nd-btn-cta { background: var(--interactive-accent); color: var(--text-on-accent); border-color: transparent; font-weight: 600; }
+.nd-modal-shell .nd-modal button.nd-btn-cta:hover { background: var(--interactive-accent-hover, var(--interactive-accent)); }
+.nd-modal-shell .nd-modal button.nd-btn-danger { color: var(--text-error, #d9534f); border-color: transparent; }
+.nd-modal-shell .nd-modal button.nd-btn-danger:hover { background: var(--background-modifier-error-hover, rgba(217, 83, 79, 0.12)); }
+
+/* ---- the ribbon badge ------------------------------------------------------ */
+/* Lives outside .nd-app — it sits on Obsidian's own ribbon button. */
+.side-dock-ribbon-action .nd-badge, .workspace-ribbon .nd-badge, .nd-badge {
+  position: absolute; top: 2px; right: 2px; min-width: 15px; height: 15px; padding: 0 4px;
+  border-radius: 999px; background: var(--interactive-accent); color: var(--text-on-accent);
+  font-size: 9.5px; line-height: 15px; text-align: center; font-weight: 700;
+  font-variant-numeric: tabular-nums; pointer-events: none;
+}
+.nd-badge.is-late { background: #c4262b; color: #fff; }
+/* The bell the badge sits on (main.js adds the class): the badge is absolute. */
+.nd-ribbon { position: relative; }
+
+/* ---- mobile ---------------------------------------------------------------- */
+
+.is-mobile .nd-app { --nd-blur: 14px; font-size: 15px; }
+/* One blurred surface per screen, not one per row. */
+.is-mobile .nd-app .nd-row, .is-mobile .nd-app .nd-chip, .is-mobile .nd-app .nd-tag {
+  -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--nd-solid);
+}
+.is-mobile .nd-app.is-plain .nd-row, .is-mobile .nd-app.is-plain .nd-chip, .is-mobile .nd-app.is-plain .nd-tag { background: var(--nd-glass); }
+/* The rule above is (0,3,0), the same weight as .nd-app .nd-row.is-late and
+   later in the file — so without this, being late stops showing on a phone,
+   which is the one place it matters most. */
+.is-mobile .nd-app .nd-row.is-late { background: var(--nd-solid-late); }
+.is-mobile .nd-app.is-plain .nd-row.is-late { background: var(--nd-late-soft); }
+.is-mobile .nd-app .nd-row.is-done { background: var(--nd-solid-done); }
+.is-mobile .nd-app .nd-page { padding: 26px 16px 48px; }
+.is-mobile .nd-app .nd-greet { font-size: 26px; }
+.is-mobile .nd-app .nd-row-acts { opacity: 1; }
+.is-mobile .nd-app .nd-page button.nd-act { padding: 9px; }
+.is-mobile .nd-app .nd-search { width: 100%; }
+.is-mobile .nd-app .nd-foot-note { display: none; }
+.is-mobile .nd-app .nd-side { -webkit-backdrop-filter: none; backdrop-filter: none; }
+/* Room for Obsidian's fixed bottom nav (about 48px) plus whatever bottom
+   spacing the app declares, on top of each side's own base padding (page 48,
+   drawer 24), so the last row and the footer links can scroll clear of it. */
+.is-mobile .nd-app .nd-page { padding-bottom: calc(96px + var(--view-bottom-spacing, 0px)); }
+.is-mobile .nd-app .nd-side { padding-bottom: calc(72px + var(--view-bottom-spacing, 0px)); }
+
+@media (max-width: 620px) {
+  .nd-app .nd-page { padding: 26px 16px 48px; }
+  .nd-app .nd-greet { font-size: 26px; }
+  .nd-app .nd-head { flex-direction: column; align-items: flex-start; gap: 10px; }
+  .nd-app .nd-head-right { flex-direction: row; align-items: center; gap: 10px; }
+  .nd-app .nd-search { width: 100%; }
+  .nd-app .nd-row-acts { opacity: 1; }
+  .nd-app .nd-add-hint { position: static; margin: 0 0 6px 4px; }
+}
+
+/* ---- touch ------------------------------------------------------------------ */
+/* A finger needs about 44px. The tick circle keeps its 22px look; a clear
+   ::after widens what it answers to. The other small controls grow. */
+.is-mobile .nd-app .nd-page button.nd-check { position: relative; }
+.is-mobile .nd-app .nd-page button.nd-check::after {
+  content: ''; position: absolute; top: -11px; right: -11px; bottom: -11px; left: -11px; border-radius: 50%;
+}
+.is-mobile .nd-app .nd-page button.nd-act,
+.is-mobile .nd-app .nd-page button.nd-side-toggle {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px;
+}
+.is-mobile .nd-app .nd-page button.nd-chip,
+.is-mobile .nd-app .nd-page button.nd-add-go,
+.is-mobile .nd-app .nd-page button.nd-list-clear,
+.is-mobile .nd-app .nd-page button.nd-link,
+.is-mobile .nd-app .nd-side button.nd-side-item {
+  display: inline-flex; align-items: center; min-height: 44px;
+}
+.is-mobile .nd-app .nd-side button.nd-side-item { display: flex; }
+.is-mobile .nd-app .nd-page button.nd-add-go { justify-content: center; }
+/* The search pill grows to hold a 44px clear button instead of clipping it. */
+.is-mobile .nd-app .nd-search { height: auto; min-height: 44px; padding-right: 0; }
+.is-mobile .nd-app .nd-page button.nd-search-clear {
+  align-items: center; justify-content: center; min-width: 44px; min-height: 44px;
+}
+.is-mobile .nd-app .nd-side-new { min-height: 44px; }
+/* In the Done header the 44px target must not make the header 44px tall:
+   the negative margin gives the height back. */
+.is-mobile .nd-app .nd-page button.nd-sec-more { margin-top: -12px; margin-bottom: -12px; }
+/* Tags are small pills in a tight wrap: widen what they answer to the way the
+   tick does, sideways only a little so neighbours (6px gap) do not overlap much. */
+.is-mobile .nd-app .nd-page button.nd-tag { position: relative; }
+.is-mobile .nd-app .nd-page button.nd-tag::after {
+  content: ''; position: absolute; top: -11px; right: -3px; bottom: -11px; left: -3px; border-radius: 999px;
+}
+.is-mobile .nd-modal-shell .nd-modal button.nd-quickdate,
+.is-mobile .nd-modal-shell .nd-modal button.nd-seg-b,
+.is-mobile .nd-modal-shell .nd-modal button.nd-btn { min-height: 44px; }
+/* No hover to reveal a row's actions on a touch screen, whatever the pane's
+   width and whether or not Obsidian calls it mobile. */
+@media (hover: none) {
+  .nd-app .nd-row-acts { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nd-app .nd-bg { animation: none; }
+  .nd-app.is-narrow .nd-side { transition: none; }
+  .nd-app .nd-row { animation: none; }
+  .nd-app .nd-row:hover { transform: none; }
+}
+
+/* ---- alerts: said once (board.js) ---------------------------------------- */
+
+.nd-app .nd-alerts { margin: 0 0 14px; padding: 12px 14px; border-radius: 14px; font-size: 13.5px; line-height: 1.45; color: var(--nd-ink); }
+.nd-app .nd-alerts p { margin: 0 0 6px; }
+.nd-app .nd-alerts-lead { font-weight: 600; }
+.nd-app .nd-alerts-text { color: var(--nd-faint); }
+.nd-app .nd-alerts-link { display: block; margin: 4px 0 10px; padding: 6px 8px; border-radius: 8px; background: var(--nd-line); font-size: 12px; word-break: break-all; -webkit-user-select: text; user-select: text; }
+.nd-app .nd-alerts-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.nd-app .nd-page button.nd-alerts-btn { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 14px; border: 0; border-radius: 100px; background: var(--rv-tint, var(--nd-ink)); color: var(--rv-tint-ink, #ffffff); box-shadow: none; font-size: 13px; font-weight: 600; cursor: pointer; }
+.nd-app .nd-page button.nd-alerts-btn.is-quiet { background: var(--nd-line); color: var(--nd-ink); }
+.nd-app .nd-page button.nd-alerts-btn .nd-icon, .nd-app .nd-page button.nd-alerts-btn svg { width: 15px; height: 15px; }
+.is-mobile .nd-app .nd-page button.nd-alerts-btn { min-height: 44px; }

@@ -8,7 +8,7 @@
    rewrites what the user typed. */
 
 const { normalizePath } = require('obsidian');
-const { parseFrontmatter, buildNote, patchFrontmatter, captureKeys, detectEOL, safeName } = require('./markdown');
+const { parseFrontmatter, buildNote, patchFrontmatter, captureKeys, detectEOL, safeName, yamlStr, FM_LAYOUT } = require('./markdown');
 const { FOLDERS } = require('./constants');
 const { SEED_AREAS, SEED_PRACTICES, SEED_GOALS, SEED_EVENTS } = require('./seed');
 const D = require('./dates');
@@ -20,6 +20,61 @@ const listEq = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
    and 2026-13-45 has the shape). */
 const realISO = s => typeof s === 'string' && D.isISO(s) && D.toISO(D.fromISO(s)) === s;
 const FLAG_KEYS = ['done', 'skip', 'snooze', 'plan'];
+
+/* ---- the two write-safety rules Vista's own writer carried --------------
+   Vista ticked Rhythm's log through a stricter copy of setFlag; now that it
+   ticks through Rhythm's api, its two rules live here, the one writer.
+   1. A flag line the frontmatter reader cannot read as a list (a multi-line
+      flow list, a folded scalar) REFUSES the write. Read as empty and written
+      back, it would lose the names on it — or add a second key beside it.
+   2. A list item holding an apostrophe is double-quoted, so a reader that
+      opens a quote at any apostrophe (Rhythm before c3ad307) still reads
+      `Mom's call, Walk` as two items. */
+
+/* The key of a top-level `key: ...` line, as the reader would take it; null
+   for a comment, blank, indented or list-marker line. */
+function topKey(line) {
+  const m = /^([A-Za-z0-9_-]+)\s*:/.exec(String(line || ''));
+  return m ? m[1] : null;
+}
+const hasRawKey = (layout, key) => layout.some(p => p.kind === 'raw' && p.lines.some(l => topKey(l) === key));
+/* An empty `key:` modelled as null, followed (past blanks) by an indented
+   line or list item: a block the reader did not attach to it, which writing
+   the key would orphan. */
+function hasOrphanedBlock(layout, key) {
+  for (let i = 0; i < layout.length; i++) {
+    const part = layout[i];
+    if (part.kind !== 'key' || part.key !== key || part.orig !== null) continue;
+    const next = layout[i + 1];
+    if (!next || next.kind !== 'raw') continue;
+    const first = next.lines.find(l => l.trim() !== '');
+    if (first !== undefined && (/^\s/.test(first) || /^-(\s|$)/.test(first))) return true;
+  }
+  return false;
+}
+/* The first flag key the reader could not read, or null. */
+function unreadableFlag(fm) {
+  const layout = fm[FM_LAYOUT] || [];
+  for (const key of FLAG_KEYS) {
+    if ((fm[key] === undefined && hasRawKey(layout, key)) || hasOrphanedBlock(layout, key)) return key;
+  }
+  return null;
+}
+function yamlItem(v) {
+  const s = String(v).replace(/\r?\n/g, ' ').trim();
+  if (s.indexOf("'") >= 0) return '"' + s.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+  return yamlStr(s);
+}
+/* serializeFrontmatter writes a list line from its value unless handed the
+   line to use for that value: hand it one for any list with an apostrophe. */
+function quotedLines(fields) {
+  const restore = {};
+  for (const k of Object.keys(fields)) {
+    const arr = fields[k];
+    if (Array.isArray(arr) && arr.some(n => String(n).indexOf("'") >= 0)) restore[k] = { value: arr, lines: [`${k}: [${arr.map(yamlItem).join(', ')}]`] };
+  }
+  return restore;
+}
 
 /* The area a note names, however it was typed: `Faith`, `[[Faith]]`,
    `[[Faith|alias]]` or `[[Some/Folder/Faith]]` all come back as `Faith` —
@@ -59,20 +114,28 @@ function makeStore(plugin) {
       .sort((a, b) => baseName(a).localeCompare(baseName(b)));
   }
 
-  async function readAll(path) {
-    const out = [];
-    for (const f of mdFiles(path)) {
+  /* keep(basename) — optional: only notes it accepts are read at all. The
+     reads run together (a folder of notes on a slow disk is one wait, not
+     one per note) and come back in name order. */
+  async function readAll(path, keep) {
+    const files = mdFiles(path).filter(f => !keep || keep(baseName(f)));
+    const read = await Promise.all(files.map(async f => {
       let text = '';
-      try { text = await v.cachedRead(f); } catch (e) { console.error('rhythm read', f.path, e); continue; }
+      try { text = await v.cachedRead(f); } catch (e) { console.error('rhythm read', f.path, e); return null; }
       const { fm, body } = parseFrontmatter(text);
-      out.push({ file: f, name: baseName(f), path: f.path, fm, body });
-    }
-    return out;
+      return { file: f, name: baseName(f), path: f.path, fm, body };
+    }));
+    return read.filter(Boolean);
   }
 
   const firstLine = body => (body || '').split(/\r?\n/).map(s => s.trim()).find(s => s && !/^#/.test(s)) || '';
 
-  async function load() {
+  /* opts.logFrom / opts.logTo (ISO, inclusive): read only the log notes in
+     that window — Fortnight's board never looks further, and a vault with
+     years of daily logs should not be read in full on every refresh. */
+  async function load(opts) {
+    const lo = opts && opts.logFrom, hi = opts && opts.logTo;
+    const inWindow = name => D.isISO(name) && (!lo || name >= lo) && (!hi || name <= hi);
     const areas = (await readAll(dir('areas'))).map(r => ({
       name: r.name, order: num(r.fm.order), note: firstLine(r.body), path: r.path,
     }));
@@ -108,7 +171,7 @@ function makeStore(plugin) {
       note: firstLine(r.body), path: r.path,
     }));
     const log = new Map();
-    for (const r of await readAll(dir('log'))) {
+    for (const r of await readAll(dir('log'), lo || hi ? inWindow : null)) {
       if (!D.isISO(r.name)) continue;
       log.set(r.name, {
         done: new Set(list(r.fm.done)),
@@ -365,11 +428,17 @@ function makeStore(plugin) {
      in each list, -1 when absent) and `snap` (where each flag key sat in
      the note and its exact source lines), which is what makes the undo
      byte-exact. */
-  async function setFlag(date, key, name, on) {
-    let prev;
+  async function setFlag(date, key, name, on, opts) {
+    let prev, refused = null;
     await processLog(date, text => {
       const { fm } = parseFrontmatter(text);
+      const bad = unreadableFlag(fm);
+      if (bad) { refused = { reason: 'unreadable', key: bad }; return text; }
       const orig = readLists(fm);
+      /* Promising a practice on a day it is already DONE would list it as
+         both, and two cards would share a key. Fortnight asks for this
+         refusal; it is decided inside the write, against the note as it is. */
+      if (opts && opts.refuseIfDone && key === 'plan' && on && orig.done.includes(name)) { refused = { reason: 'done-that-day' }; return text; }
       const cur = {};
       for (const k of FLAG_KEYS) cur[k] = orig[k].slice();
       prev = { idx: {}, snap: captureKeys(text, FLAG_KEYS, list) };
@@ -379,9 +448,10 @@ function makeStore(plugin) {
       if (key === 'done' && on) { cur.skip = toggle(cur.skip, false); cur.snooze = toggle(cur.snooze, false); cur.plan = toggle(cur.plan, false); }
       if (key === 'skip' && on) { cur.done = toggle(cur.done, false); cur.plan = toggle(cur.plan, false); }
       if (key === 'plan' && on) { cur.skip = toggle(cur.skip, false); cur.snooze = toggle(cur.snooze, false); }
-      return patchFrontmatter(text, changedFields(orig, cur, prev.snap.done === null));
+      const fields = changedFields(orig, cur, prev.snap.done === null);
+      return patchFrontmatter(text, fields, { restore: quotedLines(fields) });
     });
-    return { prev };
+    return refused ? { prev: undefined, refused } : { prev };
   }
 
   /* Put a name's four flags back exactly as `prev` describes — the actual
@@ -393,8 +463,11 @@ function makeStore(plugin) {
      returns to the bytes it had. A `prev` without idx/snap (booleans only)
      still works: names are appended. */
   async function restoreFlags(date, name, prev) {
+    let refused = null;
     await processLog(date, text => {
       const { fm } = parseFrontmatter(text);
+      const bad = unreadableFlag(fm);
+      if (bad) { refused = { reason: 'unreadable', key: bad }; return text; }
       const orig = readLists(fm);
       const cur = {};
       for (const k of FLAG_KEYS) cur[k] = orig[k].slice();
@@ -413,8 +486,11 @@ function makeStore(plugin) {
       /* A list that was an empty key line (`skip:`) goes back to that line,
          not to no key at all. */
       for (const k of FLAG_KEYS) if (k in fields && fields[k] === undefined && restore[k] && restore[k].value.length === 0) fields[k] = [];
+      const quoted = quotedLines(fields);
+      for (const k of Object.keys(quoted)) if (!restore[k]) restore[k] = quoted[k];
       return patchFrontmatter(text, fields, { restore });
     });
+    return refused ? { refused } : {};
   }
 
   const setDone = (date, name, on) => setFlag(date, 'done', name, on);
@@ -428,11 +504,25 @@ function makeStore(plugin) {
      for a side that was not written), so an undo is
      restoreFlags(from, name, prev.from) + restoreFlags(to, name, prev.to)
      — which also brings back any skip/snooze the plan cleared. */
-  async function movePlan(name, from, to) {
+  async function movePlan(name, from, to, opts) {
     const prev = { from: null, to: null };
     if (from === to) return { prev };
-    if (to) prev.to = (await setPlan(to, name, true)).prev;
-    if (from) prev.from = (await setPlan(from, name, false)).prev;
+    if (to) {
+      const r = await setFlag(to, 'plan', name, true, opts);
+      /* Refused on the new day: leave the old day's promise where it is. */
+      if (r.refused) return { prev, refused: r.refused };
+      prev.to = r.prev;
+    }
+    if (from) {
+      const r = await setPlan(from, name, false);
+      if (r.refused) {
+        /* The old day's note could not be changed: take the promise back off
+           the new day too, so the practice is planned on one day, not two. */
+        if (to && prev.to) await restoreFlags(to, name, prev.to);
+        return { prev: { from: null, to: null }, refused: r.refused };
+      }
+      prev.from = r.prev;
+    }
     return { prev };
   }
 
@@ -450,6 +540,21 @@ function makeStore(plugin) {
   async function appendLog(date, block) {
     await processLog(date, text => appendText(text, block));
     return true;
+  }
+
+  /* An Ask AI chat kept on purpose ("Save"): a new note under Chats/, never
+     an existing one — a second save that day gets " 2", " 3"… Resolves to
+     the path written. */
+  async function saveChat(date, title, body) {
+    const folder = `${root()}/Chats`;
+    await ensureFolder(root());
+    await ensureFolder(folder);
+    const base = `${folder}/${date} ${safeName(title || 'Chat').slice(0, 80)}`;
+    for (let n = 1; n < 100; n++) {
+      const path = `${base}${n > 1 ? ' ' + n : ''}.md`;
+      if (await writeIfAbsent(path, buildNote({ rhythm: 'chat', date }, body))) return path;
+    }
+    return null;
   }
 
   /* A goal's next step was done: record it in the body, set the new one. */
@@ -471,7 +576,7 @@ function makeStore(plugin) {
 
   return {
     root, dir, load, ensureTree, createArea, createPractice, createGoal, createEvent,
-    patch, rename, appendBody, setDone, setSkip, setSnooze, setPlan, restoreFlags, movePlan, ensureLogNote, appendLog, logPath,
+    patch, rename, appendBody, setFlag, setDone, setSkip, setSnooze, setPlan, restoreFlags, movePlan, ensureLogNote, appendLog, saveChat, logPath,
     completeGoalStep, seed, hasData, isOurs,
   };
 }

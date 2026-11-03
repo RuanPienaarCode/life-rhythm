@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Merged Rhythm — PRD</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --panel-2:#1d212b; --line:#2a2f3a;
+    --ink:#e7eaf0; --muted:#9aa3b2; --muted-2:#6f81a3;
+    --accent:#5b9dff; --accent-2:#7c5cff;
+    --crit:#f06464; --warn:#f5a524; --ok:#3ecf8e; --info:#5bb8ff;
+    --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+    --radius:12px; --maxw:1080px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:linear-gradient(180deg,#0c0e12,var(--bg) 240px);color:var(--ink);font-family:var(--sans);line-height:1.6;font-size:16px;padding-bottom:4rem}
+  main{max-width:var(--maxw);margin:0 auto;padding:48px 24px 96px}
+  a{color:var(--accent)}
+  header.hero{padding:8px 0 28px;border-bottom:1px solid var(--line);margin-bottom:36px}
+  .eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);font-weight:700}
+  h1{font-size:34px;line-height:1.15;margin:10px 0 8px;letter-spacing:-.02em}
+  h1 .accent{color:var(--accent-2)}
+  .lede{color:var(--muted);font-size:17px;max-width:70ch;margin:0}
+  h2{font-size:23px;margin:46px 0 14px;letter-spacing:-.01em;border-left:3px solid var(--accent);padding-left:.6rem}
+  h3{font-size:17px;margin:26px 0 8px;color:var(--muted)}
+  p{margin:10px 0} ul,ol{margin:10px 0;padding-left:22px} li{margin:5px 0}
+  .toc{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 0;list-style:none;padding:0}
+  .toc a{font-size:13px;color:var(--muted);text-decoration:none;border:1px solid var(--line);padding:5px 11px;border-radius:999px}
+  .toc a:hover{color:var(--ink);border-color:var(--accent)}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:20px 22px;margin:16px 0}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:760px){.grid2{grid-template-columns:1fr}}
+  code{font-family:var(--mono);font-size:.88em;background:#10131a;border:1px solid var(--line);padding:1px 6px;border-radius:6px}
+  pre{background:#10131a;border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;overflow:auto;margin:12px 0;font-size:13.5px;line-height:1.55}
+  pre code{background:none;border:none;padding:0;font-size:inherit}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14.5px}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--muted-2);font-weight:600;font-size:12.5px;letter-spacing:.04em;text-transform:uppercase}
+  tbody tr:nth-child(odd) td{background:var(--panel)}
+  tbody tr:nth-child(even) td{background:var(--panel-2)}
+  a:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .muted{color:var(--muted)}
+  .pill{display:inline-block;font-size:11.5px;font-weight:700;letter-spacing:.04em;padding:2px 9px;border-radius:999px;border:1px solid currentColor;vertical-align:middle}
+  .pill.draft{color:var(--warn)} .pill.review{color:var(--info)} .pill.ok{color:var(--ok)}
+  .pill.p{color:var(--accent-2);margin-right:6px}
+  .phases{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+  .phase{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px}
+  .phase .n{font-family:var(--mono);color:var(--accent);font-size:12px}
+  .phase h3{margin:4px 0 6px;color:var(--ink)}
+  .phase p,.phase li{font-size:14px}
+  .story{margin:6px 0}
+  footer{margin-top:60px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted-2);font-size:13px}
+</style>
+</head>
+<body>
+<main>
+  <header class="hero">
+    <div class="eyebrow">rhythm-vault · Product requirements</div>
+    <h1>Merged <span class="accent">Rhythm</span></h1>
+    <p class="lede">Nudge (reminders) and Fortnight (two-week planner) fold into Rhythm (practices and life priorities) as one Obsidian plugin, with one versioned API that the Vista dashboard reads. Author: Ruan Pienaar with Claude · 22 Oct 2026 · <span class="pill ok">Approved</span> (25 grilled decisions, all recommendations accepted)</p>
+    <nav aria-label="Contents"><ul class="toc">
+      <li><a href="#problem">Problem</a></li><li><a href="#goals">Goals</a></li><li><a href="#non-goals">Non-goals</a></li>
+      <li><a href="#users">Users</a></li><li><a href="#stories">Stories</a></li><li><a href="#decisions">Decisions</a></li>
+      <li><a href="#testing">Testing</a></li><li><a href="#phases">Phases</a></li><li><a href="#data">Data</a></li>
+      <li><a href="#integrations">Integrations</a></li><li><a href="#metrics">Success</a></li><li><a href="#open">Open questions</a></li>
+    </ul></nav>
+  </header>
+
+  <section id="problem">
+    <h2>2. Problem statement</h2>
+    <p>Three plugins cover one job — what to do today, this fortnight, and as a habit — and they keep re-implementing each other. Rhythm's notes are read and written by four separate code copies (Rhythm, Fortnight, Vista, and Vista's calendar via the metadata cache); Tasks lines are parsed three ways; Vista and Fortnight reach into Nudge's private <code>store</code> and Rhythm's <code>settings</code>. The copies have already drifted (Fortnight's reader ignores goals and keeps area wikilink brackets; its vendored model is two commits stale). Each drift is a chance to write a note wrongly, and each fix must land in up to four places.</p>
+    <p>The cost of not merging: three ribbons, three settings screens, two ICS meanings, and every Rhythm data-safety fix reviewed four times.</p>
+  </section>
+
+  <section id="goals">
+    <h2>3. Goals</h2>
+    <ul>
+      <li>One plugin, one view, seven pages, one ribbon — every feature of all three plugins still present.</li>
+      <li>One writer per note: Rhythm's notes are written only by Rhythm's <code>io.js</code>; the reminders note only by the reminders store.</li>
+      <li>Zero setting lost: a first load imports Nudge's and Fortnight's settings from their <code>data.json</code> without changing those files.</li>
+      <li>The phone calendar feed keeps working untouched: same path, same event UIDs, byte-identical for the same reminders.</li>
+      <li>Vista touches no planner file; it reads and ticks only through <code>api</code> <code>apiVersion: 1</code>.</li>
+      <li>All 37 existing test files from the three repos pass in <code>rhythm-vault</code>, plus new tests for import, ICS, API and Vista's adapter.</li>
+    </ul>
+  </section>
+
+  <section id="non-goals">
+    <h2>4. Non-goals</h2>
+    <ul>
+      <li>Trimming overlaps (Rhythm Plan/Week vs the Fortnight board, two quick-add parsers) — a separate pass after cutover (Q1).</li>
+      <li>Nudge's glass looks (surface, tint, mode) and Fortnight's accent choice — the whole view uses Rhythm's look (Q14).</li>
+      <li>Rewriting <code>hotkeys.json</code> — hotkeys bound to old command ids are listed for manual rebinding (Q10).</li>
+      <li>A Fortnight card on Vista — the API ships without a <code>fortnight</code> section (Q21).</li>
+      <li>Community-store submission of Rhythm; Nudge's pending first release is abandoned (Q25).</li>
+      <li>Any vault other than Pienaar Vault — no other vault has these plugins.</li>
+    </ul>
+  </section>
+
+  <section id="users">
+    <h2>5. Users &amp; access model</h2>
+    <p>One user (Ruan), on desktop and iPhone, in one local Obsidian vault synced by iCloud. No accounts, no auth, no network except Rhythm's existing subscribed-calendar fetch. Other plugins (Vista) are the only programmatic consumers, through <code>app.plugins.plugins.rhythm.api</code>.</p>
+  </section>
+
+  <section id="stories">
+    <h2>6. User stories</h2>
+    <h3>One place</h3>
+    <p class="story"><span class="pill p">v1</span>As Ruan, I want one Rhythm view with Today · Reminders · Fortnight · Week · Month · Plan · Areas so that daily, two-week and habit planning live behind one icon.</p>
+    <p class="story"><span class="pill p">v1</span>As Ruan, I want each open pane to remember its page so that I can keep Fortnight beside Today.</p>
+    <p class="story"><span class="pill p">v1</span>As Ruan, I want "Open Reminders" / "Open Fortnight" commands and the old <code>obsidian://nudge-reminders</code> links to open the right page so that my Shortcuts keep working.</p>
+    <h3>Reminders</h3>
+    <p class="story"><span class="pill p">v1</span>As Ruan, I want the compass ribbon to show how many reminders are due and to be told when one comes due, even with the view closed.</p>
+    <p class="story"><span class="pill p">v1</span>As Ruan, I want my phone's subscribed reminders calendar to carry on without re-subscribing or duplicate events.</p>
+    <h3>Planning and practices</h3>
+    <p class="story"><span class="pill p">v1</span>As Ruan, I want Fortnight to plan practices through Rhythm's own writer so that a promise made on the board reads back exactly in Rhythm.</p>
+    <p class="story"><span class="pill p">v1</span>As Ruan, I want a tick to refuse rather than overwrite when a day's note has a list line the reader can't parse.</p>
+    <h3>Settings and switch-over</h3>
+    <p class="story"><span class="pill p">v1</span>As Ruan, I want my Nudge and Fortnight settings carried over automatically on first load so that nothing has to be re-entered.</p>
+    <p class="story"><span class="pill p">v1</span>As Ruan, I want a dated backup of the four installed plugin folders before switch-over so that rollback is "put four folders back".</p>
+    <h3>Vista</h3>
+    <p class="story"><span class="pill p">v1</span>As Ruan, I want Vista's Reminders and Today cards to read and tick through Rhythm's API so that only one plugin ever writes my notes.</p>
+  </section>
+
+  <section id="decisions">
+    <h2>7. Technical decisions</h2>
+    <table>
+      <thead><tr><th>#</th><th>Decision</th><th>Choice</th><th>Rationale</th><th>Rejected</th></tr></thead>
+      <tbody>
+        <tr><td>Q1</td><td>Scope</td><td>Combine first, trim later</td><td>Each step checkable against the old plugin's behaviour</td><td>Redesign during merge</td></tr>
+        <tr><td>Q2</td><td>Host</td><td>Rhythm hosts: id <code>rhythm</code> (free in store), repo rhythm-vault, name Rhythm</td><td>Largest codebase; its data.json stays put; Vista's Rhythm reads keep working mid-switch</td><td>New plugin; Fortnight hosts</td></tr>
+        <tr><td>Q3</td><td>Views</td><td>One view type with pages; several panes allowed; each remembers its page; one ribbon</td><td>One header, one settings screen</td><td>Three view types in one plugin</td></tr>
+        <tr><td>Q4</td><td>Settings import</td><td>Automatic, once, read-only from old data.json files; marker recorded</td><td>Nothing re-entered; rollback intact</td><td>Fresh defaults; Import button</td></tr>
+        <tr><td>Q5</td><td>Vista boundary</td><td>Vista does no planner file I/O; only <code>api</code>, version-gated like Budget</td><td>One writer per file</td><td>Vista keeps vendored parsers</td></tr>
+        <tr><td>Q6</td><td>Build/release</td><td>One branch, one release; Nudge then Fortnight then Vista</td><td>No window with two writers / double notifications</td><td>Staged releases</td></tr>
+        <tr><td>Q7</td><td>Cutover</td><td>Old two disabled at the same moment; uninstalled after 30 days</td><td>No duplicates; rollback window</td><td>Uninstall at once</td></tr>
+        <tr><td>Q8</td><td>Phone ICS</td><td>Same path, same UIDs, byte-identical test</td><td>Phone needs no re-subscription</td><td>—</td></tr>
+        <tr><td>Q9</td><td>Old links</td><td><code>obsidian://nudge-reminders</code> kept as an alias (Fortnight had none)</td><td>Notes, Shortcuts, widgets keep working</td><td>Break links</td></tr>
+        <tr><td>Q10</td><td>Hotkeys</td><td>Listed in cutover notes for manual rebind</td><td>Never rewrite Obsidian config silently</td><td>Rewrite hotkeys.json</td></tr>
+        <tr><td>Q11</td><td>Version / repos</td><td>Rhythm 0.2.0; old repos archived after 30 days (asked first)</td><td>Pre-1.0 until lived in</td><td>1.0.0</td></tr>
+        <tr><td>Q12</td><td>Open work</td><td>Rhythm, Nudge audit branches merged; Fortnight's 27 files committed — each test-gated (done 22 Oct: f6f2edf, 1f57083, 13cc59f)</td><td>Merge starts from recorded code</td><td>—</td></tr>
+        <tr><td>Q13</td><td>Pages</td><td>Today · Reminders · Fortnight · Week · Month · Plan · Areas; default Today; tab bar scrolls on phone</td><td>Q1 keeps every page</td><td>Merge pages now</td></tr>
+        <tr><td>Q14</td><td>Look</td><td>Rhythm's look everywhere; Nudge glass + Fortnight accent not imported</td><td>Three visual systems in one window reads as broken</td><td>Per-page looks</td></tr>
+        <tr><td>Q15</td><td>Settings layout</td><td>Rhythm keys top-level; <code>reminders:{…}</code>, <code>planner:{…}</code>; weekStart = Rhythm's; name = Nudge's else Fortnight's; openOnStartup = either; first-run flags kept</td><td><code>plugins.rhythm.settings.folder</code> keeps working</td><td>Flat merge</td></tr>
+        <tr><td>Q16</td><td>Ribbon/notify</td><td>Compass + Nudge due badge; Nudge's 60 s due check runs on the plugin</td><td>Alerts with the view closed, as today</td><td>View-bound timer</td></tr>
+        <tr><td>Q17</td><td>Commands</td><td>All kept; Open Rhythm / Reminders / Fortnight; one deep-link command for the current page; area prefixes</td><td>17 commands, none lost</td><td>Drop commands</td></tr>
+        <tr><td>Q18</td><td>Rhythm writer</td><td>Fortnight and Vista go through <code>io.js setFlag</code>, which gains Vista's two safety rules (refuse unreadable list; quote apostrophe items)</td><td>Vista's writer was the safest copy</td><td>Keep copies</td></tr>
+        <tr><td>Q19</td><td>API</td><td>See contract below; plain data, ISO dates, opaque <code>ref</code> re-checked at write</td><td>Stale-line check lives with the writer</td><td>Expose stores</td></tr>
+        <tr><td>Q20</td><td>Vista states</td><td>absent → cards hidden; disabled / no-api → unavailable; ready; re-subscribe on reload</td><td>Budget's proven pattern, minus its fallback reader</td><td>Vista fallback reader</td></tr>
+        <tr><td>Q21</td><td>Fortnight on Vista</td><td>Later; v1 API has no <code>fortnight</code></td><td>Additive later within apiVersion 1</td><td>Now</td></tr>
+        <tr><td>Q22</td><td>Finish line</td><td>All ported tests + new tests green; real-Obsidian run; iPhone check by Ruan</td><td>—</td><td>—</td></tr>
+        <tr><td>Q23</td><td>Vista timing</td><td>Deployed at the same moment as Rhythm 0.2.0</td><td>Keeps the one-writer rule</td><td>Vista first/later</td></tr>
+        <tr><td>Q24</td><td>Rollback</td><td>Dated backup of the four installed plugin folders before switch-over</td><td>Vault runs builds older than any commit</td><td>Rebuild old bundles</td></tr>
+        <tr><td>Q25</td><td>Store</td><td>Out of scope</td><td>—</td><td>—</td></tr>
+      </tbody>
+    </table>
+    <h3>API contract (Q19)</h3>
+<pre><code>api.apiVersion === 1
+api.onChange(cb) → unsubscribe()
+api.weekStart() → 0 | 1
+api.reminders.notePath() → string
+api.reminders.summary({ today, limit }) → { available, path, rows, buckets, counts, more }   // rows carry ref
+api.reminders.toggle(ref, { today })      → { ok } | { ok:false, reason:'changed'|'repeat'|… }
+api.reminders.snooze(ref, days, { today }) → same
+api.practices.today({ date }) → { available, focus[{…, ref}], later, done, total, date, folder, streak, streakLabel }
+api.practices.tick(ref, on)   → { ok, prev } | { ok:false, reason:'unreadable'|'changed'|… }
+api.events.between(fromISO, toISO) → [{ name, date, time, area, path }]</code></pre>
+    <p class="muted"><code>weekStart</code> and <code>notePath</code> are additions found while mapping Vista: it reads Rhythm's week start for its calendar and skips the reminders note in its Tasks card.</p>
+  </section>
+
+  <section id="testing">
+    <h2>8. Testing decisions</h2>
+    <div class="grid2">
+      <div class="panel"><h3 style="margin-top:0">Seams under test</h3>
+        <ul>
+          <li><b>The API</b> (<code>src/api.js</code>) — the one cross-plugin seam; contract tests with a stubbed vault.</li>
+          <li><b>The module stores</b> as they are today: reminders store, planner store, Rhythm <code>io.js</code> — the ported suites run unchanged against them.</li>
+          <li><b>Settings import</b> — a pure function from (current, nudge data, fortnight data) to merged settings.</li>
+          <li><b>The plugin shell</b> — commands, protocol handlers, ribbon/badge, page routing, with the existing obsidian stub.</li>
+        </ul></div>
+      <div class="panel"><h3 style="margin-top:0">What a good test looks like</h3>
+        <p>Behaviour through the public interface: feed notes in, call the store/API/command, assert on the note text written and the data returned — never on private helpers.</p>
+        <h3>Prior art</h3>
+        <p>Nudge <code>tests/store.test.cjs</code>, <code>ics.test.cjs</code>; Fortnight <code>store-write.test.cjs</code>, <code>plugin-shell.test.cjs</code>; Rhythm <code>io.test.cjs</code>; Vista budget api tests.</p>
+      </div>
+    </div>
+    <p><b>Modules under test (critical path):</b> io.js setFlag safety rules, planner store's Rhythm writes through io.js, reminders ICS output, settings import conflicts, API ref staleness, Vista adapter status kinds.</p>
+  </section>
+
+  <section id="phases">
+    <h2>9. Phased delivery plan</h2>
+    <div class="phases">
+      <div class="phase"><div class="n">P0</div><h3>Land open work</h3><p>Audit branches merged, Fortnight committed. <b>Done</b> 22 Oct.</p></div>
+      <div class="phase"><div class="n">P1</div><h3>Shell</h3><p>Hosts, one view with seven pages, settings namespaces + import, commands, ribbon/badge/notify, protocol aliases.</p><p class="muted">AC: plugin-shell tests; Rhythm suite green.</p></div>
+      <div class="phase"><div class="n">P2</div><h3>Reminders page</h3><p>Nudge modules under <code>src/reminders/</code>, mounted as a page in Rhythm's look.</p><p class="muted">AC: 11 Nudge suites green; ICS byte-identical.</p></div>
+      <div class="phase"><div class="n">P3</div><h3>Fortnight page</h3><p>Fortnight under <code>src/planner/</code> on Rhythm's io.js and model; setFlag gains safety rules.</p><p class="muted">AC: 12 Fortnight suites green.</p></div>
+      <div class="phase"><div class="n">P4</div><h3>API + Vista</h3><p><code>api</code> v1; Vista adapter with four states; vendored copies deleted.</p><p class="muted">AC: contract tests both sides.</p></div>
+      <div class="phase"><div class="n">P5</div><h3>Verify + switch</h3><p>Real Obsidian in Test Vault; Ruan reviews; backup, deploy Rhythm 0.2.0 + Vista, disable Nudge/Fortnight.</p><p class="muted">AC: Q22 finish line; iPhone check.</p></div>
+    </div>
+  </section>
+
+  <section id="data">
+    <h2>10. Data model sketch</h2>
+<pre><code>Reminders note (settings.reminders.file, default Reminders.md)
+  ## List heading 1─* reminder line  "- [ ] Title ⏰ HH:MM 📅 date 🔁 rule …"
+Rhythm/ (settings.folder)
+  Areas/*.md      rhythm: area      1─* Practices (area: [[Area]])
+  Practices/*.md  rhythm: practice  *─* Log days (by name in done/skip/snooze/plan)
+  Goals/*.md      rhythm: goal      body steps "- [x] date step"
+  Events/*.md     rhythm: event     date, time
+  Log/YYYY-MM-DD.md rhythm: log     done/skip/snooze/plan lists + appended body (reviews)
+Any note: Tasks lines  "- [ ] … ⏳ day 🛫 next-week #later"   ← Fortnight cards
+Planning/Fortnight.md  ## Inbox  ← Fortnight quick-add
+data.json  { …Rhythm keys, name, reminders:{…Nudge}, planner:{…Fortnight}, imported:{nudge-reminders, fortnight-planner} }</code></pre>
+  </section>
+
+  <section id="integrations">
+    <h2>11. Integrations</h2>
+    <table>
+      <thead><tr><th>Integration</th><th>Auth</th><th>Data</th><th>Operations</th><th>Failure handling</th></tr></thead>
+      <tbody>
+        <tr><td>Obsidian Tasks plugin</td><td>none</td><td><code>globalFilter</code> via its loadData</td><td>Toggle via <code>apiV1.executeToggleTaskDoneCommand</code></td><td>Absent → no filter; plain tick</td></tr>
+        <tr><td>Vista</td><td>none</td><td><code>api</code> v1 reads</td><td>Reminder tick/snooze, practice tick</td><td>Results carry <code>ok:false</code> + reason; never throws for a stale ref</td></tr>
+        <tr><td>Phone calendar</td><td>none</td><td>.ics file written into the vault</td><td>Export command; auto-export after edits</td><td>Write error → Notice</td></tr>
+        <tr><td>Subscribed calendars</td><td>URL</td><td>webcal/https feeds</td><td>Refresh command; stale-on-open refresh</td><td>Per-feed errors counted, cache kept</td></tr>
+        <tr><td>iOS Shortcuts</td><td>none</td><td><code>obsidian://rhythm?tab=…</code>, <code>obsidian://nudge-reminders</code></td><td>Open a page / add a reminder</td><td>Unknown tab → Today</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="metrics">
+    <h2>12. Success metrics</h2>
+    <ul>
+      <li>At build: every test file green (37 ported + new); bundle passes the iOS-hazard scan.</li>
+      <li>At switch-over: Vista's two cards show and tick; phone feed unchanged (same file hash for the same reminders).</li>
+      <li>30 days after: no rollback; zero notes found rewritten by anything but Rhythm; old plugins uninstalled.</li>
+    </ul>
+  </section>
+
+  <section id="open">
+    <h2>13. Open questions</h2>
+    <p>None from the grill. Implementation choices made without asking are listed in the build report.</p>
+  </section>
+
+  <footer><p>Generated 22 Oct 2026 from the grilling session and memory file rhythm-merge-plan.md. Self-contained — no network at runtime.</p></footer>
+</main>
+</body>
+</html>

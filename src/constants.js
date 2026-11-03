@@ -18,11 +18,11 @@ const DEFAULT_SETTINGS = {
   showPrompt: true,
   /* The welcome screen and the soft entrance of each page. */
   softEntrance: true,
-  /* How Today shows what is outstanding: 'list' or 'deck'. */
+  /* How the Habits page shows what is outstanding: 'list' or 'deck'. */
   todayView: 'list',
   /* The one colour that carries meaning. An id from accents.js PRESETS, or
      'custom' with accentHex. */
-  accent: 'slate',
+  accent: 'mono',
   accentHex: '',
   /* A wallpaper behind the app: 'none', a gradient id, or 'image:<path>'
      for anything dropped in <folder>/Backgrounds. */
@@ -34,6 +34,10 @@ const DEFAULT_SETTINGS = {
   /* Subscribed calendars, one URL per line (webcal:// is fine). */
   calendarUrls: '',
   calendarCache: null,
+  /* Ask AI: the round button at the bottom right. Which AI, and its key,
+     are kept per device (src/ai/host.js); only the model names ride here. */
+  askAi: true,
+  aiModels: {},
 };
 
 const FOLDERS = {

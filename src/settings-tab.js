@@ -6,6 +6,22 @@ const { PROTOCOL } = require('./constants');
 const { refreshCalendars, calendarStatusLine } = require('./calendar');
 const { PRESETS, DEFAULT_ACCENT, swatchFor, customAccentPatch } = require('./accents');
 const BG = require('./backgrounds');
+const { NudgeSettingTab } = require('./reminders/settings-tab');
+const { FortnightSettingTab } = require('./planner/settings-tab');
+const { BUILD } = require('./build-info');
+
+/* A module's own settings code, drawn into a section of this tab. Each is
+   the module's PluginSettingTab, run against a container of its own and
+   handed the module's host as its plugin. */
+function moduleSection(containerEl, app, Tab, host) {
+  if (!host) return;
+  const box = containerEl.createDiv();
+  const tab = Object.create(Tab.prototype);
+  tab.app = app;
+  tab.plugin = host;
+  tab.containerEl = box;
+  tab.display();
+}
 
 /* Obsidian's Setting shows a name beside its control but does not tie the two
    together for assistive tech, so each control is given the name too. */
@@ -24,6 +40,14 @@ class RhythmSettingTab extends PluginSettingTab {
     const save = async () => { await this.plugin.saveSettings(); this.plugin.refreshViews(); };
 
     new Setting(containerEl)
+      .setName('Your name')
+      .setDesc('Used in the greetings on the Reminders and Fortnight pages. Leave it empty for none.')
+      .addText(t => {
+        named(t.inputEl, 'Your name');
+        t.setPlaceholder('Sam').setValue(s.name || '').onChange(async v => { s.name = String(v || '').trim(); await save(); });
+      });
+
+    new Setting(containerEl)
       .setName('Folder')
       .setDesc('Where the Areas, Practices, Goals, Events and Log folders live.')
       .addText(t => {
@@ -36,7 +60,7 @@ class RhythmSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Things in front of you')
-      .setDesc('How many practices Today shows before the rest fold away under "When there\'s space".')
+      .setDesc('How many practices the Habits page (and Today) puts in front of you before the rest fold away under "When there\'s space".')
       .addSlider(sl => {
         named(sl.sliderEl, 'Things in front of you');
         sl.setLimits(1, 7, 1).setValue(s.focusCount).setDynamicTooltip().onChange(async v => {
@@ -157,11 +181,11 @@ class RhythmSettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
-      .setName('Today shows')
-      .setDesc('A list of everything outstanding, or one card at a time from a deck you can swipe through.')
+      .setName('Habits shows')
+      .setDesc('A list of everything outstanding, one card at a time from a deck you can swipe through, or the week\'s dots and review.')
       .addDropdown(d => {
-        named(d.selectEl, 'Today shows');
-        d.addOption('list', 'A list').addOption('deck', 'One at a time').setValue(s.todayView || 'list').onChange(async v => {
+        named(d.selectEl, 'Habits shows');
+        d.addOption('list', 'A list').addOption('deck', 'One at a time').addOption('week', 'The week').setValue(s.todayView || 'list').onChange(async v => {
           s.todayView = v;
           await save();
         });
@@ -217,7 +241,7 @@ class RhythmSettingTab extends PluginSettingTab {
         this.plugin.refreshViews();
       }));
 
-    containerEl.createEl('h3', { text: 'Reminders' });
+    containerEl.createEl('h3', { text: 'Deep link' });
     new Setting(containerEl)
       .setName('Deep link')
       .setDesc(`Obsidian cannot schedule notifications, but a Shortcuts automation on iPhone ("At 7:00, open URL") or a home-screen bookmark can open Rhythm at a set time. Link: obsidian://${PROTOCOL}?tab=today`)
@@ -225,6 +249,70 @@ class RhythmSettingTab extends PluginSettingTab {
         try { await navigator.clipboard.writeText(`obsidian://${PROTOCOL}?tab=today`); new Notice('Rhythm: link copied.'); }
         catch (e) { new Notice(`Rhythm: copy failed — the link is obsidian://${PROTOCOL}?tab=today`); }
       }));
+
+    this.askAiSection(containerEl, save);
+
+    containerEl.createEl('h2', { text: 'Reminders' });
+    moduleSection(containerEl, this.app, NudgeSettingTab, this.plugin.reminders);
+    containerEl.createEl('h2', { text: 'Fortnight' });
+    moduleSection(containerEl, this.app, FortnightSettingTab, this.plugin.planner);
+
+    /* Which build is installed: the commit it was made from. */
+    containerEl.createEl('p', { text: `Rhythm ${(this.plugin.manifest && this.plugin.manifest.version) || ''} · build ${BUILD}`, cls: 'setting-item-description' });
+  }
+
+  /* Ask AI. Which AI and its key belong to THIS device (kept out of the
+     vault, so a key never syncs and the Mac can use Claude Code while the
+     phone uses a key); the model name is kept per AI in data.json. */
+  askAiSection(containerEl, save) {
+    const ai = this.plugin.ai;
+    if (!ai) return;
+    const s = this.plugin.settings;
+    containerEl.createEl('h3', { text: 'Ask AI' });
+    new Setting(containerEl)
+      .setName('Show the Ask AI button')
+      .setDesc('A round button at the bottom right. It opens a chat that can see the page you are on, and suggests changes you confirm one by one.')
+      .addToggle(t => { named(t.toggleEl, 'Show the Ask AI button'); t.setValue(s.askAi !== false).onChange(async v => { s.askAi = v; await save(); }); });
+    if (s.askAi === false) return;
+
+    const cur = ai.current();
+    new Setting(containerEl)
+      .setName('AI on this device')
+      .setDesc(ai.device.desktop
+        ? 'Claude Code and Codex use the plan you are signed in to on this computer. Claude, ChatGPT, Grok and Gemini use an API key from their own site, billed to that key. Claude Code can only answer; Codex cannot change anything, but it can read files on this computer while it answers.'
+        : 'Each uses an API key from its own site, billed to that key. Claude Code and Codex work on a computer only.')
+      .addDropdown(d => {
+        named(d.selectEl, 'AI on this device');
+        for (const p of ai.providers()) d.addOption(p.id, p.kind === 'cli' ? `${p.name} (${p.plan} plan)` : p.name);
+        d.setValue(cur.id).onChange(v => { ai.device.setProvider(v); this.display(); });
+      });
+
+    if (cur.kind === 'api') {
+      new Setting(containerEl)
+        .setName(`${cur.name} API key`)
+        .setDesc(`From ${cur.console}. Kept on this device only — it is not saved in the vault and does not sync.`)
+        .addText(t => {
+          named(t.inputEl, `${cur.name} API key`);
+          t.inputEl.type = 'password';
+          t.inputEl.autocomplete = 'off';
+          t.setPlaceholder(cur.keyHint).setValue(ai.device.key(cur.id)).onChange(v => ai.device.setKey(cur.id, v));
+        });
+    } else {
+      new Setting(containerEl)
+        .setName(`${cur.name} app`)
+        .setDesc(`Leave empty to find "${cur.bin}" in the usual places, or paste its full path.`)
+        .addText(t => { named(t.inputEl, `${cur.name} app path`); t.setPlaceholder(cur.bin).setValue(ai.device.binPath(cur.id)).onChange(v => ai.device.setBinPath(cur.id, v)); })
+        .addButton(b => b.setButtonText('Check').onClick(async () => {
+          b.setDisabled(true);
+          try { const r = await ai.check(cur.id); new Notice(`Rhythm: ${cur.name} found — ${r.version} (${r.path}).`); }
+          catch (e) { new Notice(`Rhythm: ${cur.name} did not answer — ${String((e && e.message) || e)}`); }
+          finally { b.setDisabled(false); }
+        }));
+    }
+    new Setting(containerEl)
+      .setName('Model')
+      .setDesc(cur.kind === 'api' ? `Empty uses ${cur.model}.` : 'Empty uses the app\'s own default.')
+      .addText(t => { named(t.inputEl, `${cur.name} model`); t.setPlaceholder(cur.model || 'default').setValue(ai.model(cur.id)).onChange(v => ai.setModel(cur.id, v)); });
   }
 
   cacheLine() {

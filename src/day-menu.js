@@ -23,11 +23,13 @@ function moveFrom(pr, date) {
    { prev: { from, to } } holding each date's flags before the move, or
    null for a side that was not touched. Without it (an older store) fall
    back to moving the promise back. */
+/* Resolves to the first refusal io.js gave ({ refused }), or {}. */
 async function undoMove(store, name, from, to, res) {
   const prev = res && res.prev;
-  if (!prev) { await store.movePlan(name, to, from); return; }
-  if (to && prev.to) await store.restoreFlags(to, name, prev.to);
-  if (from && prev.from) await store.restoreFlags(from, name, prev.from);
+  if (!prev) return (await store.movePlan(name, to, from)) || {};
+  if (to && prev.to) { const r = await store.restoreFlags(to, name, prev.to); if (r && r.refused) return r; }
+  if (from && prev.from) { const r = await store.restoreFlags(from, name, prev.from); if (r && r.refused) return r; }
+  return {};
 }
 
 module.exports = { dayOptions, moveFrom, undoMove };

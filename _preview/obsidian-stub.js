@@ -1,3 +1,32 @@
+/* Obsidian adds DOM helpers (createDiv, createEl, empty, addClass…) to
+   every element; the Reminders and Fortnight boards use them, so the stub
+   adds the same ones (as Fortnight's own harness did). */
+const proto = HTMLElement.prototype;
+if (!proto.createEl) {
+  const node = Node.prototype;
+  node.createEl = function (tag, o = {}) {
+    const el = document.createElement(tag);
+    if (typeof o === 'string') o = { cls: o };
+    if (o.cls) el.className = Array.isArray(o.cls) ? o.cls.filter(Boolean).join(' ') : o.cls;
+    if (o.text != null) el.textContent = o.text;
+    if (o.attr) for (const k of Object.keys(o.attr)) el.setAttribute(k, o.attr[k]);
+    this.appendChild(el);
+    return el;
+  };
+  node.createDiv = function (o) { return this.createEl('div', typeof o === 'string' ? { cls: o } : o); };
+  node.createSpan = function (o) { return this.createEl('span', typeof o === 'string' ? { cls: o } : o); };
+  proto.setText = function (t) { this.textContent = t; };
+  proto.empty = function () { while (this.firstChild) this.removeChild(this.firstChild); };
+  proto.addClass = function (...c) { this.classList.add(...c); };
+  proto.removeClass = function (...c) { this.classList.remove(...c); };
+  proto.toggleClass = function (c, on) { this.classList.toggle(c, on); };
+  proto.isShown = function () { return !!this.offsetParent; };
+}
+if (!window.createFragment) window.createFragment = cb => { const f = document.createDocumentFragment(); if (cb) cb(f); return f; };
+/* ?phone=1 — Obsidian on a phone (Platform, and the body classes it sets). */
+const PHONE = new URLSearchParams(location.search).get('phone') === '1';
+export const Platform = { isMobile: PHONE, isPhone: PHONE, isDesktop: !PHONE };
+
 /* Minimal `obsidian` stand-in for the browser harness. setIcon draws a plain
    24x24 stroke path per name so the layout matches what lucide occupies. */
 const PATHS = {
@@ -17,6 +46,13 @@ const PATHS = {
   'rotate-ccw': 'M3 12a9 9 0 1 0 3-6.7M3 3v5h5',
   calendar: 'M8 2v4M16 2v4M3 8h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z',
   'calendar-days': 'M8 2v4M16 2v4M3 8h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01',
+  bell: 'M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0',
+  repeat: 'm17 2 4 4-4 4M3 11v-1a4 4 0 0 1 4-4h14M7 22l-4-4 4-4M21 13v1a4 4 0 0 1-4 4H3',
+  'calendar-range': 'M16 2v4M8 2v4M3 10h18M17 14h-6M13 18H7M7 14h.01M17 18h.01M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z',
+  'columns-3': 'M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM9 3v18M15 3v18',
+  target: 'M12 12m-10 0a10 10 0 1 0 20 0a10 10 0 1 0-20 0M12 12m-6 0a6 6 0 1 0 12 0a6 6 0 1 0-12 0M12 12m-2 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0',
+  'list-ordered': 'M10 12h11M10 18h11M10 6h11M4 10h2M4 6h1v4M6 18H4c0-1 2-2 2-3s-1-1.500-2-1',
+  'list-todo': 'M13 5h8M13 12h8M13 19h8M3 17l2 2 4-4M3 5h6v6H3z',
   flag: 'M4 22V4a1 1 0 0 1 1-1h13l-3 5 3 5H5',
   sun: 'M12 12m-4 0a4 4 0 1 0 8 0a4 4 0 1 0-8 0M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4',
   moon: 'M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z',
@@ -81,11 +117,14 @@ export class Menu {
     const item = { title: '', icon: '', onClick: null,
       setTitle(t) { this.title = t; return this; },
       setIcon(i) { this.icon = i; return this; },
+      setWarning(w) { this.warning = w; return this; },
+      setDisabled(d) { this.disabled = d; return this; },
       onClick(f) { this.onClick = f; return this; } };
     fn(item);
     this.items.push(item);
     return this;
   }
+  addSeparator() { return this; }
   showAtPosition(pos) {
     const m = document.createElement('div');
     m.className = 'stub-menu';
@@ -108,6 +147,7 @@ export class Menu {
 export class Plugin {}
 export class ItemView {}
 export class PluginSettingTab {}
+export class FuzzySuggestModal {}
 export class Setting {}
 export class TFile {}
 export class TFolder {}

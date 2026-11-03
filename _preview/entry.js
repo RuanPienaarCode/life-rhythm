@@ -1,6 +1,13 @@
 /* Harness entry: mounts the REAL app (src/app.js) on a fake plugin host
-   backed by an in-memory vault.
-     ?seeded=1   start with the starter set plus a week of sample ticks
+   backed by an in-memory vault — with the REAL reminders and planner hosts
+   (src/reminders/host.js, src/planner/host.js) wired as main.js wires them,
+   so every page, Today, Reminders and Fortnight included, runs real code.
+     ?seeded=1   start with the starter set plus a week of sample ticks,
+                 reminders, and a few Tasks lines
+     ?phone=1    Obsidian on a phone: Platform.isPhone, the is-mobile and
+                 is-phone body classes, and the frame fills the window
+     ?still=1    no splash or soft entrance (the softEntrance setting off),
+                 for screenshots
      ?theme=dark add Obsidian's theme-dark class
      ?date=YYYY-MM-DD  pretend today is that date (Date is not patched;
                        the app's own "today" is the real one) */
@@ -9,22 +16,85 @@ const { mountApp } = require('../src/app');
 const { DEFAULT_SETTINGS } = require('../src/constants');
 const { makeStore } = require('../src/io');
 const D = require('../src/dates');
+const { mergeSettings } = require('../src/settings-merge');
+const { attachReminders } = require('../src/reminders/host');
+const { attachPlanner } = require('../src/planner/host');
 
 const q = new URLSearchParams(location.search);
 if (q.get('theme') === 'dark') document.body.classList.add('theme-dark');
+if (q.get('phone') === '1') document.body.classList.add('is-mobile', 'is-phone');
+
+/* The metadata cache, as far as the planner asks it: which notes hold task
+   list items (rebuilt from the text each time, so it never goes stale). */
+const TASK_ITEM = /^[\s>]*([-*+]|\d+[.)])[ \t]+\[(.)\](?:[ \t]|\r?$)/;
 
 const vault = makeMemoryVault({});
+let ctl = null;
 const plugin = {
   app: {
     vault,
     workspace: {
       getLeaf: () => ({ openFile: f => { console.log('[openFile]', f.path); alert('Would open ' + f.path + '\n\n' + (vault.files.get(f.path) || '')); } }),
+      onLayoutReady: cb => setTimeout(cb, 0),
+      on: () => ({}),
     },
+    metadataCache: {
+      getFileCache: f => {
+        const text = vault.files.get(f.path);
+        if (text == null) return null;
+        const listItems = text.split('\n').map((l, i) => (TASK_ITEM.test(l) ? { task: TASK_ITEM.exec(l)[2], position: { start: { line: i } } } : null)).filter(Boolean);
+        return listItems.length ? { listItems } : {};
+      },
+      on: () => ({}),
+    },
+    plugins: { plugins: {} },
     fileManager: { renameFile: (f, np) => vault.rename(f, np) },
   },
-  settings: { ...DEFAULT_SETTINGS },
+  settings: mergeSettings({ ...DEFAULT_SETTINGS }, {}, D.todayISO()).settings,
+  manifest: { id: 'rhythm' },
   _lastWrite: 0,
   async saveSettings() {},
+  registerEvent() {},
+  registerInterval() {},
+  /* as main.js */
+  forEachEmbed(kind, fn) { const e = ctl && ctl.ctx.embed; if (e && e.kind === kind) { fn(e.ctl); return true; } return false; },
+  forEachView(fn) { if (ctl) fn(ctl); },
+  refreshViews() { if (ctl) ctl.ctx.reload(); },
+  rhythmStoreFor() { return plugin.rhythmStore; },
+  changed() { plugin.feedChanged(); },
+  feedChanged() { if (ctl && ctl.ctx.feedChanged) ctl.ctx.feedChanged(); },
+  /* as main.js */
+  canAsk() { return !!ctl && plugin.settings.askAi !== false; },
+  askAbout(item) { if (ctl) ctl.ctx.askAbout(item); },
+};
+plugin.rhythmStore = makeStore(plugin);
+plugin.reminders = attachReminders(plugin);
+plugin.planner = attachPlanner(plugin);
+/* Ask AI with a stand-in AI: no key, no network. It answers from the page
+   it was given (so the context can be checked in window.__rv.asked) and
+   suggests one change of each kind it can see. ?ai=error answers with the
+   missing-key error instead. */
+const AIP = require('../src/ai/providers');
+plugin.ai = {
+  device: { desktop: true },
+  providers: () => AIP.PROVIDERS,
+  current: () => AIP.provider('claude-code'),
+  model: () => '',
+  async ask({ system, messages }) {
+    window.__rv.asked = { system, messages };
+    await new Promise(r => setTimeout(r, 400));
+    if (q.get('ai') === 'error') throw new Error('Add your Claude API key in Settings → Rhythm → Ask AI.');
+    const t = D.todayISO();
+    const screen = system.split('On the screen:\n')[1] || '';
+    const habit = /Exercise/.test(screen) ? 'Exercise' : 'Read';
+    return { text: `I can see ${screen.split('\n').filter(Boolean).length} lines on this page. Start with the slipped fence job, then exercise.\n\n\`\`\`rhythm-actions\n` + JSON.stringify([
+      { kind: 'add_reminder', title: 'Buy paint for the fence', due: D.addDays(t, 1), time: '09:00' },
+      { kind: 'tick_habit', name: habit },
+      { kind: 'move_todo', text: 'Paint the fence on the north side of the garden', date: D.addDays(t, 1) },
+      { kind: 'note', text: 'Asked AI for a plan for today.' },
+      { kind: 'move_todo', text: 'Nothing called this', date: t },
+    ]) + '\n\`\`\`', model: 'fake' };
+  },
 };
 const view = {
   plugin,
@@ -56,7 +126,24 @@ async function seedSample() {
     { name: 'Book club', date: D.addDays(t, 4), time: '19:00', location: 'The library' },
     { name: 'A friend\'s birthday', date: D.addDays(t, 11), time: '', allDay: true },
   ], errors: [] };
+  /* Reminders and Tasks lines for the Reminders, Fortnight and Today pages. */
+  await vault.create('Reminders.md', [
+    '# Reminders', '', '## Home',
+    `- [ ] Water the plants ⏰ 07:30 📅 ${D.addDays(t, -1)} 🔁 every week`,
+    `- [ ] Book the car service 🔼 📅 ${t}`,
+    `- [ ] Renew the licence disc before the end of the month, it expires soon ⏫ 📅 ${D.addDays(t, 3)}`,
+    '- [ ] Learn to bake bread', '', '## Work',
+    `- [ ] Send the quarterly report ⏰ 16:00 📅 ${D.addDays(t, 1)}`,
+  ].join('\n') + '\n');
+  await vault.create('Projects/House.md', [
+    `- [ ] Fix the gate ⏳ ${t}`,
+    `- [ ] Paint the fence on the north side of the garden ⏳ ${D.addDays(t, -2)}`,
+    `- [ ] Clear the gutters ⏳ ${D.addDays(t, 2)}`,
+    '- [ ] Repaint the shed #later',
+  ].join('\n') + '\n');
+  await vault.create('Planning/Fortnight.md', '# Fortnight\n\n## Inbox\n');
   plugin.settings.onboarded = true;
+  plugin.settings.planner.lastWelcome = t;
   plugin._lastWrite = 0;
 }
 
@@ -86,7 +173,8 @@ const FAKE_PHOTO = 'data:image/svg+xml;charset=utf8,' + encodeURIComponent(`
     plugin.settings.background = bg;
   }
   if (q.get('dim')) plugin.settings.backgroundDim = Number(q.get('dim'));
-  const ctl = mountApp(view);
+  if (q.get('still')) plugin.settings.softEntrance = false;
+  ctl = mountApp(view);
   window.__rv = { ctl, vault, plugin };
   await ctl.start();
   const tab = q.get('tab');

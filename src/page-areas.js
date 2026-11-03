@@ -1,5 +1,8 @@
 'use strict';
-/* Areas — the page where you shape the list rather than work it.
+/* Priorities — the page where you shape the list rather than work it
+   ("Areas" until 26 Oct 2026; the notes are still areas, in Rhythm/Areas). Each
+   area is a priority, ranked by its `order`; Today and Habits walk them in
+   this order, so moving one up here moves it up there.
 
    Today answers "what now". This answers "what should be asked of me at
    all", which is the question behind a list that has grown too long. So
@@ -14,17 +17,18 @@ const { titleBar, groupHeader, group, emptyLine } = require('./widgets');
 
 function renderAreas(page, ctx) {
   const { state } = ctx;
+  page.classList.add('rv-page-areas');
   const today = D.todayISO();
   const areas = [...state.data.areas].sort((a, b) => (a.order ?? 99) - (b.order ?? 99) || a.name.localeCompare(b.name));
   const aside = state.data.aside || [];
   const active = state.data.practices || [];
 
-  titleBar(page, 'In order of priority', 'Areas');
-  el(page, 'p', 'rv-lead', `${active.length} practices are being asked of you. Tap an area to see its own, and set aside anything that is not this season.`);
+  titleBar(page, 'Most important first', 'Priorities');
+  el(page, 'p', 'rv-lead', `${active.length} practices are being asked of you. Today walks these from the top. Tap one to see its practices, and set aside anything that is not this season.`);
 
-  if (!areas.length) { emptyLine(page, 'No areas yet. An area is a part of life you want to keep a rhythm in.'); return; }
+  if (!areas.length) { emptyLine(page, 'No priorities yet. A priority is a part of life you want to keep a rhythm in.'); return; }
 
-  groupHeader(page, 'Areas');
+  groupHeader(page, 'In order', String(areas.length));
   const list = group(page, 'rv-areas');
   areas.forEach((a, i) => {
     const open = state.openArea === a.name;
@@ -84,7 +88,7 @@ function renderAreas(page, ctx) {
   }
 
   const foot = el(page, 'div', 'rv-foot');
-  const b = button(foot, 'rv-link', 'Add an area', () => ctx.add('area'), 'plus');
+  const b = button(foot, 'rv-link', 'Add a priority', () => ctx.add('area'), 'plus');
 
   /* Swap with a neighbour, then renumber 1..n so hand-edited or missing
      orders settle into a clean sequence. */
