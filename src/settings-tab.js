@@ -261,15 +261,16 @@ class RhythmSettingTab extends PluginSettingTab {
     containerEl.createEl('p', { text: `Rhythm ${(this.plugin.manifest && this.plugin.manifest.version) || ''} · build ${BUILD}`, cls: 'setting-item-description' });
   }
 
-  /* Ask AI (computers only: plugin.ai is null on a phone or tablet, which
-     gets one line saying so and no controls). Which AI and its key belong to
-     THIS device (kept out of the vault, so a key never syncs); the model
-     name is kept per AI in data.json. */
+  /* Ask AI (computers only: plugin.ai is null on a real phone or tablet,
+     which gets one line saying so and no controls). The plan routes (Claude
+     Code, Codex) come first and are the default; API keys are a later choice.
+     Which AI and its key belong to THIS device (kept out of the vault, so a
+     key never syncs); the model name is kept per AI in data.json. */
   askAiSection(containerEl, save) {
     const ai = this.plugin.ai;
     if (!ai) {
       containerEl.createEl('h3', { text: 'Ask AI' });
-      containerEl.createEl('p', { text: 'Ask AI is for your computer. It is off on phones and tablets.', cls: 'setting-item-description' });
+      containerEl.createEl('p', { text: 'Ask AI runs on your Mac with your Claude or ChatGPT plan (Claude Code or Codex). It is not available on phones and tablets.', cls: 'setting-item-description' });
       return;
     }
     const s = this.plugin.settings;
@@ -283,10 +284,10 @@ class RhythmSettingTab extends PluginSettingTab {
     const cur = ai.current();
     new Setting(containerEl)
       .setName('AI on this device')
-      .setDesc('Claude Code and Codex use the plan you are signed in to on this computer. Claude, ChatGPT, Grok and Gemini use an API key from their own site, billed to that key. Claude Code can only answer; Codex cannot change anything, but it can read files on this computer while it answers.')
+      .setDesc('The Claude plan (Claude Code) and the ChatGPT plan (Codex) use the plan you are signed in to on this computer, with no key. Both can only answer: they are started with every tool switched off, and stopped if one tries to run. An API key is another choice, billed to that key.')
       .addDropdown(d => {
         named(d.selectEl, 'AI on this device');
-        for (const p of ai.providers()) d.addOption(p.id, p.kind === 'cli' ? `${p.name} (${p.plan} plan)` : p.name);
+        for (const p of ai.providers()) d.addOption(p.id, p.menu);
         d.setValue(cur.id).onChange(v => { ai.device.setProvider(v); this.display(); });
       });
 
@@ -303,7 +304,7 @@ class RhythmSettingTab extends PluginSettingTab {
     } else {
       new Setting(containerEl)
         .setName(`${cur.name} app`)
-        .setDesc(`Leave empty to find "${cur.bin}" in the usual places, or paste its full path.`)
+        .setDesc(this.foundLine(ai, cur))
         .addText(t => { named(t.inputEl, `${cur.name} app path`); t.setPlaceholder(cur.bin).setValue(ai.device.binPath(cur.id)).onChange(v => ai.device.setBinPath(cur.id, v)); })
         .addButton(b => b.setButtonText('Check').onClick(async () => {
           b.setDisabled(true);
@@ -316,6 +317,14 @@ class RhythmSettingTab extends PluginSettingTab {
       .setName('Model')
       .setDesc(cur.kind === 'api' ? `Empty uses ${cur.model}.` : 'Empty uses the app\'s own default.')
       .addText(t => { named(t.inputEl, `${cur.name} model`); t.setPlaceholder(cur.model || 'default').setValue(ai.model(cur.id)).onChange(v => ai.setModel(cur.id, v)); });
+  }
+
+  /* Where a plan route's program was found, or what to do if it was not. */
+  foundLine(ai, cur) {
+    const loc = ai.where ? ai.where(cur.id) : null;
+    if (!loc) return `Leave empty to find "${cur.bin}" in the usual places, or paste its full path.`;
+    if (loc.path) return `Found at ${loc.path}. Leave empty to use it, or paste another full path.`;
+    return `"${cur.bin}" was not found in the usual places. Install it, or paste its full path.`;
   }
 
   cacheLine() {

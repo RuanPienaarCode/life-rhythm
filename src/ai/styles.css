@@ -104,6 +104,53 @@
 /* Obsidian makes the whole app unselectable; iOS 15 only reads the prefixed
    property, so answers need both to be copied. */
 .rv-app .rv-ai-text { white-space: pre-wrap; word-break: break-word; -webkit-user-select: text; user-select: text; }
+/* An answer is Markdown (src/ai/md.js). Scoped to .rv-app and set outright
+   (not inherited from Obsidian's own table/pre/code rules). A table sits in a
+   wrapper that scrolls sideways and keeps its natural width; a code block
+   scrolls on its own, so neither stretches the bubble. */
+.rv-app .rv-ai-msg.is-ai { min-width: 0; }
+.rv-app .rv-ai-md { min-width: 0; max-width: 100%; white-space: normal; overflow-wrap: anywhere; -webkit-user-select: text; user-select: text; }
+.rv-app .rv-ai-md > :first-child { margin-top: 0; }
+.rv-app .rv-ai-md > :last-child { margin-bottom: 0; }
+.rv-app .rv-ai-md p.rv-md-p { margin: 0 0 8px; }
+.rv-app .rv-ai-md .rv-md-h { margin: 12px 0 5px; font-weight: 650; line-height: 1.25; letter-spacing: -0.15px; color: var(--rv-ink); }
+.rv-app .rv-ai-md .rv-md-h1 { font-size: 17px; }
+.rv-app .rv-ai-md .rv-md-h2 { font-size: 16px; }
+.rv-app .rv-ai-md .rv-md-h3, .rv-app .rv-ai-md .rv-md-h4, .rv-app .rv-ai-md .rv-md-h5, .rv-app .rv-ai-md .rv-md-h6 { font-size: 14.5px; }
+.rv-app .rv-ai-md ul.rv-md-ul, .rv-app .rv-ai-md ol.rv-md-ol { margin: 0 0 8px; padding: 0 0 0 1.4em; list-style-position: outside; }
+.rv-app .rv-ai-md ul.rv-md-ul { list-style-type: disc; }
+.rv-app .rv-ai-md ol.rv-md-ol { list-style-type: decimal; }
+.rv-app .rv-ai-md li { margin: 2px 0; padding: 0; }
+.rv-app .rv-ai-md li > ul.rv-md-ul, .rv-app .rv-ai-md li > ol.rv-md-ol { margin: 2px 0 2px; }
+.rv-app .rv-ai-md strong { font-weight: 650; }
+.rv-app .rv-ai-md a.external-link { color: var(--rv-tint-text); text-decoration: underline; }
+.rv-app .rv-ai-md code.rv-md-code {
+  padding: 1px 5px; border-radius: 5px; background: var(--rv-fill);
+  font-family: var(--font-monospace, ui-monospace, Menlo, monospace); font-size: 0.9em; color: var(--rv-ink);
+}
+.rv-app .rv-ai-md pre.rv-md-pre {
+  display: block; box-sizing: border-box; max-width: 100%; margin: 0 0 8px; padding: 10px 12px;
+  overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch;
+  border-radius: var(--rv-radius-sm); background: var(--rv-fill); border: 0;
+  white-space: pre; word-break: normal; overflow-wrap: normal;
+  font-family: var(--font-monospace, ui-monospace, Menlo, monospace); font-size: 12.5px; line-height: 1.5; color: var(--rv-ink);
+}
+.rv-app .rv-ai-md pre.rv-md-pre code { padding: 0; background: none; border: 0; font: inherit; white-space: inherit; color: inherit; }
+.rv-app .rv-ai-md .rv-md-scroll {
+  box-sizing: border-box; max-width: 100%; margin: 0 0 8px; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch;
+}
+.rv-app .rv-ai-md table.rv-md-table {
+  width: max-content; min-width: 100%; margin: 0; border-collapse: collapse; border: 0; font-size: 13px; line-height: 1.35;
+}
+.rv-app .rv-ai-md table.rv-md-table th, .rv-app .rv-ai-md table.rv-md-table td {
+  padding: 5px 10px; border: 0; border-bottom: 0.5px solid var(--rv-hair); text-align: left; vertical-align: top;
+  overflow-wrap: normal; word-break: normal; white-space: nowrap; background: none; color: var(--rv-ink);
+}
+.rv-app .rv-ai-md table.rv-md-table th { font-weight: 650; background: var(--rv-fill); }
+.rv-app .rv-ai-md table.rv-md-table th.is-right, .rv-app .rv-ai-md table.rv-md-table td.is-right { text-align: right; }
+.rv-app .rv-ai-md table.rv-md-table th.is-center, .rv-app .rv-ai-md table.rv-md-table td.is-center { text-align: center; }
+.rv-app .rv-ai-md blockquote.rv-md-quote { margin: 0 0 8px; padding: 2px 0 2px 10px; border: 0; border-left: 3px solid var(--rv-hair); color: var(--rv-dim); }
+.rv-app .rv-ai-md hr.rv-md-hr { margin: 10px 0; border: 0; border-top: 0.5px solid var(--rv-hair); }
 .rv-app .rv-ai-msg.is-you { align-self: flex-end; background: var(--rv-tint); color: var(--rv-tint-ink); border-bottom-right-radius: 6px; }
 .rv-app .rv-ai-msg.is-ai { align-self: flex-start; background: var(--rv-card); border: 0.5px solid var(--rv-hair); border-bottom-left-radius: 6px; }
 .rv-app .rv-ai-msg.is-error { align-self: flex-start; background: var(--rv-card); border: 1px solid var(--rv-warn); border-bottom-left-radius: 6px; }

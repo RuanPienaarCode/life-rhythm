@@ -1,33 +1,32 @@
 'use strict';
 /* Ask AI on the plugin: which AI this device uses, its key, and ask().
 
-   Computers only (no AI on a phone or tablet). Per device, never in the
-   vault (a key must not ride iCloud to every device): the provider, each
-   API key and each app path live in Obsidian's local storage for this vault
-   on this device. Per vault, in data.json: the model name for each AI
-   (settings.aiModels) and whether the button shows (settings.askAi). */
+   Only where the device can run a program (src/ai/cli.js makeRunner(): the
+   real platform, Platform.isDesktopApp + window.require + child_process; never
+   a mobile flag). On a real phone or tablet that is false, attachAi returns
+   null, and null is "no Ask AI at all": no button, no menu entry, no key
+   field, no request, no app link (Ruan, 3 Nov 2026). Obsidian's mobile
+   emulation on a Mac does not change this: the Mac can still run programs, so
+   Ask AI stays and works.
 
-const { requestUrl, Platform } = require('obsidian');
+   The plan routes (Claude Code, Codex) come first and are the default. API
+   keys remain as a later choice on the computer. Per device, never in the
+   vault (a key must not ride iCloud to every device): the provider, each API
+   key and each app path live in Obsidian's local storage for this vault on
+   this device. Per vault, in data.json: the model name for each AI
+   (settings.aiModels) and whether the button shows (settings.askAi).
+   ask() below is the ONLY caller of providers.ask (tests pin that). */
+
+const { requestUrl } = require('obsidian');
 const P = require('./providers');
 const { makeRunner } = require('./cli');
 
 const PREFIX = 'rhythm-ai-';
-const CLI_TIMEOUT = 3 * 60 * 1000;
-
-/* No AI on mobile (Ruan, 3 Nov 2026): on a phone or tablet there is no Ask
-   AI at all — null, so no button, no item menu entry, no key field, and
-   nothing leaves the device. Every caller already reads null as "off".
-   ask() below is the ONLY caller of providers.ask (tests/ai-host.test.cjs
-   pins that), and it refuses again at call time, so even if mobile turns on
-   after load (a phone-sized emulation) no request is made. */
-const mobile = () => !!(Platform && Platform.isMobile);
-const OFF = 'Ask AI is for your computer. It is off on phones and tablets.';
 
 function attachAi(plugin) {
-  if (mobile()) return null;
+  const runner = makeRunner();
+  if (!runner) return null;
   const app = plugin.app;
-  let runner;
-  const getRunner = () => (runner === undefined ? (runner = makeRunner()) : runner);
 
   function load(key) {
     try {
@@ -44,15 +43,18 @@ function attachAi(plugin) {
     } catch (e) { /* storage blocked: nothing remembered */ }
   }
 
-  const desktop = !!(Platform && Platform.isDesktopApp);
   const device = {
-    desktop,
-    /* Starts on Claude Code (the plan you already pay for). */
+    desktop: true,
+    /* The saved choice is respected, except a saved API route with no key on
+       this device while a plan route is found: the plan wins (no keys are
+       needed on this computer). With no choice: Claude Code when it is found,
+       else Codex when it is found, else the API route. */
     provider() {
-      const id = load('provider');
-      const p = P.PROVIDERS.find(x => x.id === id);
-      if (p && (p.kind === 'api' || desktop)) return p.id;
-      return desktop ? 'claude-code' : 'anthropic';
+      const saved = P.PROVIDERS.find(x => x.id === load('provider'));
+      const plan = P.CLIS.find(id => !!runner.locate(P.provider(id).bin, device.binPath(id)).path);
+      if (saved && saved.kind === 'cli') return saved.id;
+      if (saved && (device.key(saved.id) || !plan)) return saved.id;
+      return plan || 'anthropic';
     },
     setProvider(id) { save('provider', id); },
     key(id) { return String(load('key-' + id) || ''); },
@@ -65,34 +67,34 @@ function attachAi(plugin) {
 
   return {
     device,
-    providers: () => P.PROVIDERS.filter(p => p.kind === 'api' || desktop),
+    /* The plan routes first, then the API-key ones. */
+    providers: () => P.PROVIDERS,
     current: () => P.provider(device.provider()),
+    /* Where a plan route's program was found on this computer ('' = not found). */
+    where: id => runner.locate(P.provider(id).bin, device.binPath(id)),
     model(id) { return String(models()[id] || ''); },
     async setModel(id, v) {
       plugin.settings.aiModels = Object.assign({}, models(), { [id]: String(v || '').trim() });
       if (!plugin.settings.aiModels[id]) delete plugin.settings.aiModels[id];
       await plugin.saveSettings();
     },
-    /* system: the rules + page; messages: the chat so far. */
-    ask({ system, messages }) {
-      if (mobile()) return Promise.reject(new Error(OFF));
+    /* system: the rules + page together (the API routes); rules + page apart
+       and the chat so far in messages (the plan routes put the page on stdin,
+       never in a command line). */
+    ask({ system, rules, page, messages }) {
       const p = P.provider(device.provider());
-      const r = p.kind === 'cli' ? getRunner() : null;
       return P.ask({
-        provider: p.id, system, messages,
+        provider: p.id, system, rules, page, messages,
         model: models()[p.id] || p.model,
         apiKey: device.key(p.id),
         request: requestUrl,
-        run: r ? (bin, args, opts) => r.run(bin, args, Object.assign({ configured: device.binPath(p.id) }, opts)) : undefined,
-        timeoutMs: CLI_TIMEOUT,
+        run: p.kind === 'cli' ? o => runner.run(o.id, Object.assign({ configured: device.binPath(p.id) }, o)) : undefined,
       });
     },
     async check(id) {
-      if (mobile()) throw new Error(OFF);
       const p = P.provider(id);
-      const r = getRunner();
-      if (!r || p.kind !== 'cli') throw new Error('Only on a computer.');
-      return r.check(p.bin, device.binPath(id));
+      if (p.kind !== 'cli') throw new Error('Only the Claude Code and Codex routes have an app to check.');
+      return runner.check(p.bin, device.binPath(id));
     },
   };
 }

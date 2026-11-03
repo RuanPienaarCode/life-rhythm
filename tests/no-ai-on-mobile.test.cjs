@@ -1,9 +1,14 @@
 'use strict';
-/* Ruan's rule (3 Nov 2026): no AI on mobile. Platform.isMobile is true on a
-   phone AND an iPad. Run against the BUILT main.js (needs a build), the whole
-   plugin as Obsidian loads it:
-   - mobile: no plugin.ai, canAsk() false, no AI command, no Ask AI setting
-     or key field, no request to any AI service;
+/* Ruan's rule (3 Nov 2026): no AI on a real phone or tablet. "Real" is the
+   platform's own answer (plan-ai spec 3, 3b): no Platform.isDesktopApp, no
+   window.require, no child_process. Obsidian's mobile emulation on a Mac sets
+   isMobile / isPhone / isIosApp and leaves isDesktopApp true: there Ask AI
+   still shows and works. Run against the BUILT main.js (needs a build), the
+   whole plugin as Obsidian loads it:
+   - real phone: no plugin.ai, canAsk() false, no AI command, no Ask AI
+     setting or key field, no request to any AI service, no app link, and
+     Settings says Ask AI runs on the Mac with the Claude or ChatGPT plan;
+   - emulation on the Mac: Ask AI is there, plan routes first, default Claude Code;
    - computer: Ask AI is there as before (ai, the settings, the toggle).
    Plus source guards: every "Ask AI about this" menu entry sits behind
    canAsk(), and the round button is only mounted when plugin.ai exists. */
@@ -11,6 +16,7 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 const Module = require('node:module');
+const { fakeCp, fakeFs, fakeOs } = require('./ai-_fake.cjs');
 
 const root = path.join(__dirname, '..');
 const bundlePath = path.join(root, 'main.js');
@@ -69,8 +75,15 @@ global.window = globalThis;
 const origLoad = Module._load;
 Module._load = function (request, ...rest) { return request === 'obsidian' ? stub : origLoad.call(this, request, ...rest); };
 
-const boot = async mobile => {
-  stub.Platform.isMobile = mobile; stub.Platform.isPhone = mobile; stub.Platform.isDesktopApp = !mobile;
+/* Node reachable through window.require, as on a Mac */
+const HOME = '/Users/test';
+const mods = { child_process: fakeCp(), fs: fakeFs([`${HOME}/.local/bin/claude`, '/opt/homebrew/bin/codex']), os: fakeOs(HOME) };
+const PHONE = { isMobile: true, isPhone: true, isIosApp: true, isDesktop: false, isDesktopApp: false };
+const EMULATED = { isMobile: true, isPhone: true, isIosApp: true, isDesktop: false, isDesktopApp: true };
+const MAC = { isMobile: false, isPhone: false, isIosApp: false, isDesktop: true, isDesktopApp: true };
+const boot = async platform => {
+  Object.assign(stub.Platform, platform);
+  if (platform.isDesktopApp) globalThis.require = n => mods[n]; else delete globalThis.require;
   const Rhythm = require(bundlePath);
   const p = new Rhythm();
   await p.onload();
@@ -80,19 +93,29 @@ const askSettings = () => settingsMade.filter(s => /Ask AI|AI on this device|API
 
 (async () => {
   try {
-    /* ---- mobile ---- */
+    /* ---- a real phone or tablet ---- */
     {
-      const p = await boot(true);
-      assert.strictEqual(p.ai, null, 'mobile: no AI object at all');
-      assert.strictEqual(p.canAsk(), false, 'mobile: nothing may ask');
-      assert.ok(!p.commands.some(c => /\bai\b/i.test(c.id + ' ' + c.name)), 'mobile: no AI command');
-      assert.strictEqual(requests.length, 0, 'mobile: no request to any AI service');
+      const p = await boot(PHONE);
+      assert.strictEqual(p.ai, null, 'phone: no AI object at all');
+      assert.strictEqual(p.canAsk(), false, 'phone: nothing may ask');
+      assert.ok(!p.commands.some(c => /\bai\b/i.test(c.id + ' ' + c.name)), 'phone: no AI command');
+      assert.strictEqual(requests.length, 0, 'phone: no request to any AI service');
+      p.onunload();
+    }
+
+    /* ---- mobile emulation on the Mac: it still shows and works ---- */
+    {
+      const p = await boot(EMULATED);
+      assert.ok(p.ai && typeof p.ai.ask === 'function', 'emulation: Ask AI is there');
+      assert.strictEqual(p.ai.current().id, 'claude-code', 'emulation: it starts on the Claude plan');
+      assert.deepStrictEqual(p.ai.providers().slice(0, 2).map(x => x.menu), ['Claude plan (Claude Code)', 'ChatGPT plan (Codex)'], 'emulation: the plan routes are first');
+      assert.strictEqual(p.canAsk(), true, 'emulation: an open view can be asked');
       p.onunload();
     }
 
     /* ---- computer ---- */
     {
-      const p = await boot(false);
+      const p = await boot(MAC);
       assert.ok(p.ai && typeof p.ai.ask === 'function', 'computer: Ask AI is there');
       assert.strictEqual(p.ai.current().id, 'claude-code', 'computer: it starts on the Claude plan via Claude Code');
       assert.strictEqual(p.canAsk(), true, 'computer: an open view can be asked');
@@ -110,14 +133,15 @@ const askSettings = () => settingsMade.filter(s => /Ask AI|AI on this device|API
     };
     {
       const tab = tabFor(null);
-      assert.deepStrictEqual(askSettings().map(s => s.name), [], 'mobile: no Ask AI toggle, provider, key, app or model setting');
+      assert.deepStrictEqual(askSettings().map(s => s.name), [], 'phone: no Ask AI toggle, provider, key, app or model setting');
       const words = tab.containerEl.all().map(e => e.text).join('\n');
-      assert.ok(/Ask AI is for your computer/.test(words), 'mobile: Settings says so in one line');
-      assert.ok(!/api key|plan you are signed|billed/i.test(words), 'mobile: no key or plan wording');
+      assert.ok(/Ask AI runs on your Mac with your Claude or ChatGPT plan \(Claude Code or Codex\)/.test(words), 'phone: Settings says so in one line');
+      assert.strictEqual(tab.containerEl.all().filter(e => /Ask AI runs on/.test(e.text)).length, 1, 'phone: exactly one such line');
+      assert.ok(!/api key|billed|signed in/i.test(words), 'phone: no key field or billing wording');
     }
     {
       const AIP = require('../src/ai/providers');
-      tabFor({ device: { desktop: true, key: () => '', binPath: () => '' }, providers: () => AIP.PROVIDERS, current: () => AIP.provider('claude-code'), model: () => '' });
+      tabFor({ device: { desktop: true, key: () => '', binPath: () => '' }, providers: () => AIP.PROVIDERS, current: () => AIP.provider('claude-code'), model: () => '', where: id => ({ path: '/Users/test/.local/bin/' + AIP.provider(id).bin }) });
       const names = askSettings().map(s => s.name);
       assert.ok(['Show the Ask AI button', 'AI on this device', 'Claude Code app', 'Model'].every(n => names.includes(n)), `computer: Ask AI settings (${names.join(', ')})`);
     }
@@ -136,6 +160,13 @@ const askSettings = () => settingsMade.filter(s => /Ask AI|AI on this device|API
     assert.strictEqual((app.match(/mountAskAi\(/g) || []).length, 1, 'one mount point for the round button');
     assert.ok(/canAsk\(\) \{ return !!\(askAi && plugin\.ai/.test(app), 'item menus ask only through a mounted button');
     assert.ok(/canAsk\(\) \{ return !!this\.ai/.test(read('main.js')), 'the module boards ask only when plugin.ai exists');
+
+    /* no app link, clipboard handoff or web-chat address anywhere in src */
+    const walk = d => fs.readdirSync(d, { withFileTypes: true }).flatMap(e => (e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]));
+    for (const f of walk(path.join(root, 'src')).filter(f => f.endsWith('.js'))) {
+      const code = fs.readFileSync(f, 'utf8');
+      assert.ok(!/claude:\/\/|chatgpt\.com\/\?q=|claude\.ai\/new/.test(code), `${path.relative(root, f)}: no app-link handoff`);
+    }
 
     console.log('no ai on mobile OK');
   } finally {

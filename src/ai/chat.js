@@ -16,6 +16,7 @@
 const { el, button, clear } = require('../dom');
 const C = require('./context');
 const A = require('./actions');
+const MD = require('./md');
 
 const ASK = ['What should I do first?', 'Sum up this page', 'What am I forgetting?'];
 const ASK_ITEM = ['Help me get this done', 'Break it into small steps', 'When should I do it?'];
@@ -23,7 +24,8 @@ const ASK_ITEM = ['Help me get this done', 'Break it into small steps', 'When sh
 /* root: the app root. o: {
      enabled() -> show the button at all,
      snapshot(focus) -> { page, date, today, screen, focus } as it is NOW,
-     ask({ system, messages }) -> Promise<{ text, model }>,
+     ask({ system, rules, page, messages }) -> Promise<{ text, model }> — system is rules + page together (API routes); the plan CLIs take them apart,
+       with the page on stdin,
      providerName() -> 'Claude Code', 'Gemini', …,
      run(action) -> Promise<{ ok, text }> — make one confirmed change,
      save(markdown, title) -> Promise<string|null> — the note's path,
@@ -160,7 +162,9 @@ function mountAskAi(root, o) {
     }
     for (const m of messages) {
       const b = el(log, 'div', 'rv-ai-msg ' + (m.role === 'user' ? 'is-you' : m.error ? 'is-error' : 'is-ai'));
-      el(b, 'div', 'rv-ai-text', m.content);
+      /* Your words and an error stay plain; an answer is Markdown. */
+      if (m.role === 'assistant' && !m.error) MD.render(el(b, 'div', 'rv-ai-text rv-ai-md'), m.content);
+      else el(b, 'div', 'rv-ai-text', m.content);
       if (m.error && /Settings/.test(m.content)) button(b, 'rv-ai-link', 'Open Settings', () => o.openSettings());
       if (m.actions && m.actions.length) {
         const acts = el(b, 'div', 'rv-ai-acts');
@@ -191,11 +195,13 @@ function mountAskAi(root, o) {
     busy = true;
     draw();
     const snap = snapshot();
-    const system = C.systemPrompt({ context: C.pageContext(snap), today: snap.today, focus: snap.focus });
+    const page = C.pageContext(snap);
+    const system = C.systemPrompt({ context: page, today: snap.today, focus: snap.focus });
+    const rules = C.rules({ today: snap.today, focus: snap.focus });
     const history = messages.filter(m => !m.error).map(m => ({ role: m.role, content: m.raw || m.content }));
     const asked = chatId;
     try {
-      const r = await o.ask({ system, messages: history });
+      const r = await o.ask({ system, rules, page, messages: history });
       if (asked !== chatId) return;
       const split = A.splitReply(r.text, snap.today);
       messages.push({

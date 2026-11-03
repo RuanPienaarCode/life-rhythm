@@ -14,7 +14,7 @@ const messages = [
 
 /* ---- the list ---------------------------------------------------------- */
 
-assert.deepStrictEqual(P.PROVIDERS.map(p => p.id), ['anthropic', 'openai', 'xai', 'gemini', 'claude-code', 'codex']);
+assert.deepStrictEqual(P.PROVIDERS.map(p => p.id), ['claude-code', 'codex', 'anthropic', 'openai', 'xai', 'gemini'], 'the plan routes come first');
 assert.deepStrictEqual(P.PROVIDERS.filter(p => p.kind === 'cli').map(p => p.id), ['claude-code', 'codex']);
 for (const p of P.PROVIDERS.filter(p => p.kind === 'api')) assert.ok(p.model && p.keyHint && p.name, `${p.id} has a default model, key hint and name`);
 assert.strictEqual(P.provider('nope').id, 'anthropic', 'an unknown id falls back to the first');
@@ -94,46 +94,24 @@ assert.match(P.httpFailure('Claude', 400, { error: { message: 'bad' } }), /Claud
   await assert.rejects(P.ask({ provider: 'anthropic', apiKey: 'K', system, messages, request: async () => { throw new Error('offline'); } }), /Could not reach Claude.*offline/);
   await assert.rejects(P.ask({ provider: 'anthropic', apiKey: 'K', system, messages, request: async () => ({ status: 200, text: 'not json' }) }), /could not read/i);
 
-  /* ---- the CLIs: no tools at all, nothing saved ---------------------- */
-
-  const ca = P.cliArgs('claude-code', { system, model: '' });
-  const at = (args, flag) => args[args.indexOf(flag) + 1];
-  assert.strictEqual(at(ca, '--tools'), '', 'Claude Code gets no tools: it cannot read files, run commands or browse');
-  assert.strictEqual(at(ca, '--permission-mode'), 'dontAsk');
-  assert.strictEqual(at(ca, '--system-prompt'), system);
-  for (const f of ['-p', '--no-session-persistence', '--strict-mcp-config']) assert.ok(ca.includes(f), `claude ${f}`);
-  assert.ok(!ca.includes('--bare'), '--bare would drop the plan sign-in');
-  assert.ok(!ca.includes('--model'), 'no model flag when none is set');
-  assert.strictEqual(at(P.cliArgs('claude-code', { system, model: 'opus' }), '--model'), 'opus');
-
-  const xa = P.cliArgs('codex', { system, model: '' });
-  assert.deepStrictEqual(xa.slice(0, 2), ['exec', '--json']);
-  assert.strictEqual(at(xa, '--sandbox'), 'read-only');
-  assert.ok(xa.includes('--ephemeral') && xa.includes('--ignore-user-config') && xa[xa.length - 1] === '-');
-  assert.ok(!xa.join(' ').includes('web_search'), 'no web search in a chat');
-
-  const prompt = P.cliPrompt('claude-code', { system, messages });
-  assert.ok(prompt.includes('You: What is due today?') && prompt.includes('AI: Two reminders.'), 'the earlier turns ride along');
-  assert.ok(prompt.trimEnd().endsWith('Which first?'), 'the new question comes last');
-  assert.ok(!prompt.includes(system), 'Claude Code gets the rules through --system-prompt');
-  assert.ok(P.cliPrompt('codex', { system, messages }).startsWith(system), 'Codex has no system flag: the rules lead');
+  /* ---- the CLIs (command lines, caps and the guard: tests/ai-cli.test.cjs) ---- */
 
   assert.deepStrictEqual(P.cliRead('claude-code', '{"type":"system","subtype":"init","model":"claude-opus"}\n{"type":"result","result":"Hello","is_error":false}\n'), { text: 'Hello', model: 'claude-opus', stop: '' });
   assert.throws(() => P.cliRead('claude-code', '{"type":"result","is_error":true,"result":"Please log in"}'), /not signed in/);
   assert.deepStrictEqual(P.cliRead('codex', '{"type":"item.completed","item":{"type":"agent_message","text":"Hi"}}\n'), { text: 'Hi', model: 'Codex', stop: '' });
+  assert.strictEqual(P.cliRead('codex', '{"type":"item.completed","item":{"type":"agent_message","text":"I will look"}}\n{"type":"item.completed","item":{"type":"agent_message","text":"Final"}}\n').text, 'Final', 'the last message is the answer');
   assert.throws(() => P.cliRead('codex', '{"type":"turn.failed","error":{"message":"401 Unauthorized"}}'), /Codex is not signed in/);
   assert.throws(() => P.cliRead('codex', ''), /sent nothing/);
 
-  await assert.rejects(P.ask({ provider: 'claude-code', system, messages }), /runs on a computer only/, 'the phone has no runner');
+  await assert.rejects(P.ask({ provider: 'claude-code', system, messages }), /runs on a computer only/, 'a device with no runner cannot run a plan route');
   const ran = [];
-  const out = await P.ask({ provider: 'claude-code', system, messages, timeoutMs: 1000, run: async (bin, args, opts) => { ran.push({ bin, args, opts }); return { code: 0, stdout: '{"type":"result","result":"Fine"}', stderr: '' }; } });
+  const out = await P.ask({ provider: 'claude-code', system, rules: 'RULES', page: 'PAGE TEXT', messages, run: async o => { ran.push(o); return { code: 0, stdout: '{"type":"result","result":"Fine"}', stderr: '' }; } });
   assert.strictEqual(out.text, 'Fine');
-  assert.strictEqual(ran[0].bin, 'claude');
-  assert.ok(ran[0].opts.stdin.includes('Which first?'));
-  const enoent = Object.assign(new Error('x'), { code: 'ENOENT' });
-  await assert.rejects(P.ask({ provider: 'codex', system, messages, run: async () => { throw enoent; } }), /Could not find Codex \(codex\)/);
-  const late = Object.assign(new Error('x'), { code: 'TIMEOUT' });
-  await assert.rejects(P.ask({ provider: 'codex', system, messages, timeoutMs: 120000, run: async () => { throw late; } }), /longer than 2 minutes/);
+  assert.strictEqual(ran[0].id, 'claude-code');
+  assert.strictEqual(ran[0].system, 'RULES', 'the command line carries the rules only');
+  assert.ok(ran[0].input.includes('PAGE TEXT') && ran[0].input.includes('[User]\nWhich first?'), 'the page and the chat go on stdin');
+  assert.ok(!ran[0].system.includes('PAGE TEXT'));
+  await assert.rejects(P.ask({ provider: 'codex', system, messages, run: async () => ({ spawnError: { code: 'ENOENT' } }) }), /Codex wasn’t found on this computer.*set its path/);
 
   console.log('ai providers OK');
 })().catch(e => { console.error(e); process.exit(1); });
