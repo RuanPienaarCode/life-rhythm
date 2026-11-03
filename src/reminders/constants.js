@@ -29,6 +29,9 @@ const DEFAULT_SETTINGS = {
 
   /* In-app notices, while Obsidian is open. */
   notify: true,
+  /* The board has said once, plainly, that those notices cannot reach a
+     closed app or a locked phone (audit 3 Nov 2026). */
+  toldAlerts: false,
   alarmMinutes: 10,
   allDayAlarmTime: '09:00',
   ribbonBadge: true,

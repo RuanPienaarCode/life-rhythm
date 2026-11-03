@@ -17,7 +17,7 @@ const { renderMonth } = require('./page-month');
 const { renderAreas } = require('./page-areas');
 const { renderPlan } = require('./page-plan');
 const { undoMove } = require('./day-menu');
-const { openAddModal, openEditModal, openNextStepModal, openNoteModal, openDateModal } = require('./modals');
+const { openAddModal, openEditModal, openNextStepModal, openNoteModal, openDateModal, openConfirmModal } = require('./modals');
 const { openEditor: openReminderEditor } = require('./reminders/modals');
 const { refreshCalendars, calendarEvents, isStale, urls } = require('./calendar');
 const { applyAccent } = require('./accents');
@@ -224,17 +224,28 @@ function mountApp(view) {
       else ctx.toast(`${card.text} → ${D.relative(date, D.todayISO())}`);
       ctx.feedChanged();
     },
-    async removeCard(card) {
+    /* Delete, with Undo. A repeating line asks first: deleting it ends the
+       repeat for good (the store refuses it until the person says so). */
+    async removeCard(card, series) {
       const pstore = plugin.planner.store;
       let r;
-      try { r = await pstore.remove(card); }
+      try { r = await pstore.remove(card, series ? { series: true } : undefined); }
       catch (e) { console.error('rhythm delete', e); r = { ok: false, reason: 'error' }; }
+      if (r && r.reason === 'repeats') {
+        openConfirmModal(app, ctx, {
+          title: 'Delete a repeating item?',
+          text: `"${card.text}" repeats. Deleting it ends the repeat for good — every later one goes too. To skip just this one, tick it instead.`,
+          confirm: 'Delete the series',
+          onConfirm: () => ctx.removeCard(card, true),
+        });
+        return;
+      }
       if (r && r.ok === false) { if (r.reason !== 'busy') new Notice(`Rhythm: couldn't delete "${card.text}": ${why(r.reason)}.`); }
       else {
         ctx.toast(`Deleted: ${card.text}`, 'Undo', async () => {
           let b;
           try { b = await pstore.putBack(r); } catch (e) { console.error('rhythm undo delete', e); b = { ok: false }; }
-          if (!b.ok) new Notice(`Rhythm: couldn't put "${card.text}" back.`);
+          if (!b.ok) new Notice(`Rhythm: couldn't put "${card.text}" back — its note changed around it, so nothing was written. The line was: ${r.raw.replace(/\r$/, '')}`);
           ctx.feedChanged();
         });
       }

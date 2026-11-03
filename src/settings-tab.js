@@ -8,6 +8,7 @@ const { PRESETS, DEFAULT_ACCENT, swatchFor, customAccentPatch } = require('./acc
 const BG = require('./backgrounds');
 const { NudgeSettingTab } = require('./reminders/settings-tab');
 const { FortnightSettingTab } = require('./planner/settings-tab');
+const { BUILD } = require('./build-info');
 
 /* A module's own settings code, drawn into a section of this tab. Each is
    the module's PluginSettingTab, run against a container of its own and
@@ -255,6 +256,9 @@ class RhythmSettingTab extends PluginSettingTab {
     moduleSection(containerEl, this.app, NudgeSettingTab, this.plugin.reminders);
     containerEl.createEl('h2', { text: 'Fortnight' });
     moduleSection(containerEl, this.app, FortnightSettingTab, this.plugin.planner);
+
+    /* Which build is installed: the commit it was made from. */
+    containerEl.createEl('p', { text: `Rhythm ${(this.plugin.manifest && this.plugin.manifest.version) || ''} · build ${BUILD}`, cls: 'setting-item-description' });
   }
 
   /* Ask AI. Which AI and its key belong to THIS device (kept out of the

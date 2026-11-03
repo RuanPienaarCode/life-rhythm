@@ -647,3 +647,16 @@
   .nd-app .nd-row { animation: none; }
   .nd-app .nd-row:hover { transform: none; }
 }
+
+/* ---- alerts: said once (board.js) ---------------------------------------- */
+
+.nd-app .nd-alerts { margin: 0 0 14px; padding: 12px 14px; border-radius: 14px; font-size: 13.5px; line-height: 1.45; color: var(--nd-ink); }
+.nd-app .nd-alerts p { margin: 0 0 6px; }
+.nd-app .nd-alerts-lead { font-weight: 600; }
+.nd-app .nd-alerts-text { color: var(--nd-faint); }
+.nd-app .nd-alerts-link { display: block; margin: 4px 0 10px; padding: 6px 8px; border-radius: 8px; background: var(--nd-line); font-size: 12px; word-break: break-all; -webkit-user-select: text; user-select: text; }
+.nd-app .nd-alerts-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.nd-app .nd-page button.nd-alerts-btn { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 14px; border: 0; border-radius: 100px; background: var(--rv-tint, var(--nd-ink)); color: var(--rv-tint-ink, #ffffff); box-shadow: none; font-size: 13px; font-weight: 600; cursor: pointer; }
+.nd-app .nd-page button.nd-alerts-btn.is-quiet { background: var(--nd-line); color: var(--nd-ink); }
+.nd-app .nd-page button.nd-alerts-btn .nd-icon, .nd-app .nd-page button.nd-alerts-btn svg { width: 15px; height: 15px; }
+.is-mobile .nd-app .nd-page button.nd-alerts-btn { min-height: 44px; }

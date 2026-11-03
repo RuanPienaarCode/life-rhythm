@@ -83,6 +83,29 @@ function mountBoard(view) {
     nodes.count = el(hr, 'div', 'nd-count');
     nodes.date = el(hr, 'div', 'nd-date', D.shortDate(state.today, state.today));
 
+    /* Said once, plainly: a notice can only ring while Obsidian is open, so
+       a locked phone never buzzes. The way to be reminded is a Shortcuts
+       automation that opens this page each morning (audit 3 Nov 2026). */
+    if (!plugin.settings.toldAlerts) {
+      const vault = app.vault.getName ? app.vault.getName() : '';
+      const link = `obsidian://rhythm?${vault ? `vault=${encodeURIComponent(vault)}&` : ''}tab=reminders`;
+      const box = el(page, 'section', 'nd-alerts nd-glass');
+      box.setAttribute('aria-label', 'About alerts');
+      el(box, 'p', 'nd-alerts-lead', 'Alerts only ring while Obsidian is open — a locked phone will not buzz for these.');
+      el(box, 'p', 'nd-alerts-text', 'Keep anything with a hard time in iOS Reminders too. For a nudge each morning, add a Shortcuts automation on your phone: Personal Automation → Time of Day → Open URL, with this link:');
+      el(box, 'code', 'nd-alerts-link', link);
+      const row = el(box, 'div', 'nd-alerts-actions');
+      button(row, 'nd-alerts-btn', 'Copy link', async () => {
+        try { await navigator.clipboard.writeText(link); new Notice('Rhythm: link copied.'); }
+        catch (e) { new Notice('Rhythm: copy failed — select the link and copy it.'); }
+      }, 'copy');
+      button(row, 'nd-alerts-btn is-quiet', 'Got it', async () => {
+        plugin.settings.toldAlerts = true;
+        box.remove();
+        try { await plugin.saveSettings(); } catch (e) { console.error('rhythm reminders', e); }
+      });
+    }
+
     /* quick add */
     const add = el(page, 'div', 'nd-add nd-glass');
     icon(add, 'plus', 'nd-add-icon');

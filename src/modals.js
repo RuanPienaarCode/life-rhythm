@@ -364,6 +364,31 @@ class DateModal extends Modal {
   onClose() { clear(this.contentEl); }
 }
 
+/* A yes/no before something that cannot be undone: today, deleting a
+   repeating to-do or reminder (the whole series goes). The safe answer is
+   the default and the first button. */
+class ConfirmModal extends Modal {
+  constructor(app, ctx, o) {
+    super(app);
+    this.ctx = ctx;
+    this.o = o;
+  }
+  onOpen() {
+    this.modalEl && this.modalEl.classList.add('rv-modal');
+    applyAccent(this.contentEl, this.ctx.settings);
+    const c = this.contentEl;
+    clear(c);
+    c.classList.add('rv-app', 'rv-modal-body');
+    el(c, 'h2', 'rv-modal-title', this.o.title);
+    el(c, 'p', 'rv-modal-hint', this.o.text);
+    const actions = el(c, 'div', 'rv-modal-actions');
+    const keep = button(actions, 'rv-btn rv-btn-primary', this.o.cancel || 'Keep it', () => this.close());
+    button(actions, 'rv-btn', this.o.confirm, () => { this.close(); this.o.onConfirm(); });
+    window.setTimeout(() => keep.focus(), 30);
+  }
+  onClose() { clear(this.contentEl); }
+}
+
 const cmdLabel = () => (navigator.platform && /mac|iphone|ipad/i.test(navigator.platform) ? '⌘' : 'Ctrl+');
 
 function openAddModal(app, ctx, kind) { new ItemModal(app, ctx, { kind }).open(); }
@@ -371,5 +396,6 @@ function openNoteModal(app, ctx, date) { new NoteModal(app, ctx, date).open(); }
 function openEditModal(app, ctx, kind, rec) { new ItemModal(app, ctx, { kind, rec }).open(); }
 function openNextStepModal(app, ctx, goal) { new NextStepModal(app, ctx, goal).open(); }
 function openDateModal(app, ctx, name, date, onPick) { new DateModal(app, ctx, name, date, onPick).open(); }
+function openConfirmModal(app, ctx, o) { new ConfirmModal(app, ctx, o).open(); }
 
-module.exports = { openAddModal, openEditModal, openNextStepModal, openNoteModal, openDateModal, ItemModal, NextStepModal, NoteModal, KINDS, CADENCES };
+module.exports = { openAddModal, openEditModal, openNextStepModal, openNoteModal, openDateModal, openConfirmModal, ItemModal, NextStepModal, NoteModal, KINDS, CADENCES };

@@ -773,7 +773,7 @@ const rhythm = { rhythm: { settings: {} } };
     const store = makeStore({ app, settings: {} });
     const card = { source: 'tasks', path: 'H.md', line: 1, raw: '- [ ] Fix the gate' };
     const r = await store.remove(card);
-    assert.deepStrictEqual(r, { ok: true, path: 'H.md', line: 1, raw: '- [ ] Fix the gate' });
+    assert.deepStrictEqual(r, { ok: true, path: 'H.md', line: 1, raw: '- [ ] Fix the gate', before: '# Home', after: 'notes' });
     assert.strictEqual(app.files.get('H.md'), '# Home\nnotes');
     assert.deepStrictEqual(await store.putBack(r), { ok: true });
     assert.strictEqual(app.files.get('H.md'), '# Home\n- [ ] Fix the gate\nnotes');
@@ -792,10 +792,64 @@ const rhythm = { rhythm: { settings: {} } };
     const app = makeApp({ 'Reminders.md': `# Inbox\n${raw}` }, { 'nudge-reminders': { store: nudge } });
     const store = makeStore({ app, settings: {} });
     const r = await store.remove({ source: 'nudge', path: 'Reminders.md', line: 1, raw });
-    assert.deepStrictEqual(r, { ok: true, path: 'Reminders.md', line: 1, raw });
+    assert.deepStrictEqual(r, { ok: true, path: 'Reminders.md', line: 1, raw, before: '# Inbox', after: null });
     assert.deepStrictEqual(removed, [raw]);
     await store.putBack(r);
     assert.strictEqual(app.files.get('Reminders.md'), `# Inbox\n${raw}`);
+  }
+
+  /* 29b. Audit 3 Nov 2026, H4: Delete on a repeating to-do ends the series
+          for good, so it is refused unless the person said so (series);
+          and Undo puts the line back between the SAME neighbours, not at a
+          line number the note has since moved past. */
+  {
+    const note = '# Home\n- [ ] Back up the vault 🔁 every month 📅 2026-11-15\nnotes';
+    const app = makeApp({ 'H.md': note });
+    const store = makeStore({ app, settings: {} });
+    const card = { source: 'tasks', path: 'H.md', line: 1, raw: '- [ ] Back up the vault 🔁 every month 📅 2026-11-15' };
+    assert.deepStrictEqual(await store.remove(card), { ok: false, reason: 'repeats' });
+    assert.strictEqual(app.files.get('H.md'), note, 'nothing deleted');
+    const r = await store.remove(card, { series: true });
+    assert.strictEqual(r.ok, true, 'the person confirmed: the series goes');
+    assert.strictEqual(app.files.get('H.md'), '# Home\nnotes');    /* a ticked record of a repeat deletes without asking */
+    const rec = '- [x] Back up the vault 🔁 every month 📅 2026-10-15 ✅ 2026-10-16';
+    const app2 = makeApp({ 'H.md': rec });
+    const r2 = await makeStore({ app: app2, settings: {} }).remove({ source: 'tasks', path: 'H.md', line: 0, raw: rec });
+    assert.strictEqual(r2.ok, true, 'a ticked record is not the series');
+  }
+  {
+    const app = makeApp({ 'H.md': '# Home\n- [ ] Fix the gate\n## Later\n- [ ] Paint' });
+    const store = makeStore({ app, settings: {} });
+    const r = await store.remove({ source: 'tasks', path: 'H.md', line: 1, raw: '- [ ] Fix the gate' });
+    /* the note changes before Undo: two lines arrive above */
+    app.files.set('H.md', '# Top\nnew line\n# Home\n## Later\n- [ ] Paint');
+    assert.deepStrictEqual(await store.putBack(r), { ok: true });
+    assert.strictEqual(app.files.get('H.md'), '# Top\nnew line\n# Home\n- [ ] Fix the gate\n## Later\n- [ ] Paint', 'back under # Home, not under # Top');
+  }
+  {
+    /* the top line of its note; a line arrives above it: back above the
+       line that was below it */
+    const app = makeApp({ 'H.md': '- [ ] Fix the gate\n- [ ] Paint\nend' });
+    const store = makeStore({ app, settings: {} });
+    const r = await store.remove({ source: 'tasks', path: 'H.md', line: 0, raw: '- [ ] Fix the gate' });
+    app.files.set('H.md', '# Added above\n- [ ] Paint\nend');
+    assert.deepStrictEqual(await store.putBack(r), { ok: true });
+    assert.strictEqual(app.files.get('H.md'), '# Added above\n- [ ] Fix the gate\n- [ ] Paint\nend');
+  }
+  {
+    const app = makeApp({ 'H.md': '# Home\n- [ ] Fix the gate\n## Later' });
+    const store = makeStore({ app, settings: {} });
+    const r = await store.remove({ source: 'tasks', path: 'H.md', line: 1, raw: '- [ ] Fix the gate' });
+    app.files.set('H.md', '# Elsewhere\nall rewritten');
+    assert.deepStrictEqual(await store.putBack(r), { ok: false, reason: 'changed' }, 'its neighbours are gone: refuse rather than guess');
+    assert.strictEqual(app.files.get('H.md'), '# Elsewhere\nall rewritten');
+  }
+  {
+    const app = makeApp({ 'H.md': '# Home\r\n- [ ] Fix the gate\r\nnotes\r\n' });
+    const store = makeStore({ app, settings: {} });
+    const r = await store.remove({ source: 'tasks', path: 'H.md', line: 1, raw: '- [ ] Fix the gate\r' });
+    await store.putBack(Object.assign({}, r, { raw: '- [ ] Fix the gate' }));
+    assert.strictEqual(app.files.get('H.md'), '# Home\r\n- [ ] Fix the gate\r\nnotes\r\n', 'a CRLF note gets its CRLF back');
   }
 
   /* 30. Edit: Tasks' answer replaces the to-do's line, and nothing else */

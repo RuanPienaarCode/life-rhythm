@@ -5,6 +5,9 @@ cd "$(dirname "$0")/.."
 VAULT="${RHYTHM_VAULT_PATH:-$HOME/Library/Mobile Documents/iCloud~md~obsidian/Documents/Pienaar Vault}"
 DEST="$VAULT/.obsidian/plugins/rhythm"
 [ -f main.js ] || { echo "main.js missing — run ./build.sh first" >&2; exit 1; }
+# Refuse a deploy that could lose work: dirty tree, a main.js not built from
+# HEAD, or an installed build this branch does not contain (scripts/deploy-check.mjs).
+node scripts/deploy-check.mjs "$PWD" "$DEST"
 mkdir -p "$DEST"
 for f in main.js styles.css manifest.json; do cp "$f" "$DEST/$f"; done
 fail=0

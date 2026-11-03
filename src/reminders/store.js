@@ -302,11 +302,20 @@ function makeStore(plugin) {
      (Vista and Fortnight call this store) has to be a reminder line we
      could have written: an item with no raw text, or one whose text is
      prose, matches nothing and changes nothing. */
-  function withLines(item, fn) {
+  /* A line found only by its words (the fallback) is refused when it
+     repeats: after a tick elsewhere, that line is the NEXT occurrence, and
+     editing, snoozing or deleting it from a screen that is out of date
+     would act on the live series (audit 3 Nov 2026, H1). opts.exact refuses
+     every fallback — Delete wants the very line it was shown. */
+  function withLines(item, fn, opts) {
     if (!item || typeof item.raw !== 'string' || !T.parseLine(item.raw)) return Promise.resolve({ ok: false });
     return edit(lines => {
       const found = locate(lines, item);
       if (found.at === -1) return { ok: false };
+      if (found.fallback) {
+        const cur = T.parseLine(lines[found.at]);
+        if ((opts && opts.exact) || (cur && cur.repeat)) return { ok: false, reason: 'stale' };
+      }
       return fn(lines, found.at, found.fallback);
     });
   }
@@ -445,7 +454,7 @@ function makeStore(plugin) {
   const setDue = (item, due) => setDate(item, 'due', due);
 
   async function remove(item) {
-    return withLines(item, (lines, i) => { lines.splice(i, 1); });
+    return withLines(item, (lines, i) => { lines.splice(i, 1); }, { exact: true });
   }
 
   /* One pass over the note for lines written in the old order. Writes only

@@ -194,7 +194,7 @@ function makeStore(plugin) {
      — several lines if it likes (Tasks writes a repeating to-do's next
      occurrence above the ticked one) — or REMOVE to take the line out, or
      refuse(reason) to write nothing at all. */
-  async function editLine(card, fn) {
+  async function editLine(card, fn, info) {
     const file = app.vault.getFileByPath(card.path);
     if (!file) return { ok: false, reason: 'missing' };
     let out = { ok: false, reason: 'changed' };
@@ -222,6 +222,8 @@ function makeStore(plugin) {
       const bare = cr ? card.raw.slice(0, -1) : card.raw;
       const res = fn(bare);
       if (res === REMOVE) {
+        /* What a later Undo needs to find the place again (putBack). */
+        if (info) Object.assign(info, { line: at, before: at > 0 ? lines[at - 1] : null, after: at < lines.length - 1 ? lines[at + 1] : null });
         lines.splice(at, 1);
       } else if (res && typeof res === 'object') {
         out = { ok: false, reason: res.refuse };
@@ -590,35 +592,70 @@ function makeStore(plugin) {
   /* Delete: the line leaves its note — a to-do from the note it is written
      in, a reminder through the reminders module. Says where it was and what
      it read, so the page can offer Undo (putBack). Events are fixed. */
-  function remove(card) { return once(card, () => removeNow(card)); }
-  async function removeNow(card) {
+  /* A 🔁 line is refused ('repeats') unless opts.series: deleting it ends
+     the repeat for good, which the page asks about first (audit 3 Nov 2026,
+     H4). The answer carries the line's neighbours, for putBack. */
+  function remove(card, opts) { return once(card, () => removeNow(card, opts)); }
+  async function removeNow(card, opts) {
     if (card.source === 'event') return { ok: false, reason: 'locked' };
+    /* A ticked 🔁 line is a record: its next occurrence is a line of its own,
+       so deleting the record ends nothing. */
+    if (!(opts && opts.series) && !isDone(card) && (L.parseTask(String(card.raw || '').replace(/\r$/, '')) || {}).recurrence) return { ok: false, reason: 'repeats' };
     if (card.source === 'tasks') {
-      const r = await editLine(card, () => REMOVE);
-      return r.ok ? { ok: true, path: card.path, line: card.line, raw: card.raw } : r;
+      const at = {};
+      const r = await editLine(card, () => REMOVE, at);
+      return r.ok ? { ok: true, path: card.path, line: at.line, raw: card.raw, before: at.before, after: at.after } : r;
     }
     if (card.source === 'nudge') {
       const ours = nudge();
       if (!ours || typeof ours.remove !== 'function') return { ok: false, reason: 'no-nudge' };
       const held = await nudgeHolds(ours, card);
       if (!held) return { ok: false, reason: 'changed' };
+      const file = app.vault.getFileByPath(ours.path());
+      const lines = file ? String(await app.vault.read(file)).split('\n') : [];
+      if (lines[held.line] !== undefined && lines[held.line].replace(/\r$/, '') !== held.raw.replace(/\r$/, '')) return { ok: false, reason: 'changed' };
+      const before = held.line > 0 && lines.length ? lines[held.line - 1] : null;
+      const after = held.line < lines.length - 1 ? lines[held.line + 1] : null;
       const r = await ours.remove(held);
-      return r && r.ok === false ? { ok: false, reason: r.reason || 'changed' } : { ok: true, path: ours.path(), line: held.line, raw: held.raw };
+      return r && r.ok === false ? { ok: false, reason: r.reason || 'changed' } : { ok: true, path: ours.path(), line: held.line, raw: held.raw, before, after };
     }
     return { ok: false, reason: 'unknown' };
   }
 
-  /* Undo a delete: the line goes back at the line it was on (or at the
-     end, if the note has grown shorter since). `gone` is what remove gave. */
+  /* Undo a delete: the line goes back between the same two neighbours it
+     had — at its old line number when they are still there, else wherever
+     that pair now is, if it is in one place only; else beside ONE of them
+     (not a blank line) if that is in one place only. Neighbours gone (the
+     note was rewritten): refuse rather than guess. A CRLF note gets its \r. */
   async function putBack(gone) {
     const file = gone && app.vault.getFileByPath(gone.path);
     if (!file) return { ok: false, reason: 'missing' };
+    let ok = false;
     await app.vault.process(file, text => {
       const lines = text.split('\n');
-      lines.splice(Math.min(gone.line, lines.length), 0, gone.raw);
+      const fits = p => (gone.before == null ? p === 0 : p > 0 && lines[p - 1] === gone.before)
+        && (gone.after == null ? p === lines.length : lines[p] === gone.after);
+      let at = gone.line <= lines.length && fits(gone.line) ? gone.line : -1;
+      if (at < 0) {
+        const all = [];
+        for (let p = 0; p <= lines.length; p++) if (fits(p)) all.push(p);
+        if (all.length === 1) at = all[0];
+      }
+      if (at < 0) {
+        const real = s => s != null && s.replace(/\r$/, '').trim() !== '';
+        const near = [];
+        for (let p = 0; p <= lines.length; p++) {
+          if ((real(gone.before) && p > 0 && lines[p - 1] === gone.before) || (real(gone.after) && lines[p] === gone.after)) near.push(p);
+        }
+        if (near.length === 1) at = near[0];
+      }
+      if (at < 0) return text;
+      const crlf = lines.some(l => l.endsWith('\r'));
+      lines.splice(at, 0, crlf && !gone.raw.endsWith('\r') ? gone.raw + '\r' : gone.raw);
+      ok = true;
       return lines.join('\n');
     });
-    return { ok: true };
+    return ok ? { ok: true } : { ok: false, reason: 'changed' };
   }
 
   /* Edit a to-do: its line becomes `text` (Tasks' edit box answers with the
