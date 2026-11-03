@@ -266,7 +266,11 @@ class RhythmSettingTab extends PluginSettingTab {
      phone uses a key); the model name is kept per AI in data.json. */
   askAiSection(containerEl, save) {
     const ai = this.plugin.ai;
-    if (!ai) return;
+    if (!ai) {
+      containerEl.createEl('h3', { text: 'Ask AI' });
+      containerEl.createEl('p', { text: 'Ask AI is for your computer. It is off on phones and tablets.', cls: 'setting-item-description' });
+      return;
+    }
     const s = this.plugin.settings;
     containerEl.createEl('h3', { text: 'Ask AI' });
     new Setting(containerEl)

@@ -75,7 +75,8 @@ plugin.planner = attachPlanner(plugin);
    suggests one change of each kind it can see. ?ai=error answers with the
    missing-key error instead. */
 const AIP = require('../src/ai/providers');
-plugin.ai = {
+/* as host.js: none on a phone */
+plugin.ai = q.get('phone') === '1' ? null : {
   device: { desktop: true },
   providers: () => AIP.PROVIDERS,
   current: () => AIP.provider('claude-code'),

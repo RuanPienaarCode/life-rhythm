@@ -14,7 +14,11 @@ const { makeRunner } = require('./cli');
 const PREFIX = 'rhythm-ai-';
 const CLI_TIMEOUT = 3 * 60 * 1000;
 
+/* No AI on mobile (Ruan, 3 Nov 2026): on a phone or tablet there is no Ask
+   AI at all — null, so no button, no item menu entry, no key field, and
+   nothing leaves the device. Every caller already reads null as "off". */
 function attachAi(plugin) {
+  if (Platform && Platform.isMobile) return null;
   const app = plugin.app;
   let runner;
   const getRunner = () => (runner === undefined ? (runner = makeRunner()) : runner);
@@ -37,8 +41,7 @@ function attachAi(plugin) {
   const desktop = !!(Platform && Platform.isDesktopApp);
   const device = {
     desktop,
-    /* A computer starts on Claude Code (the plan you already pay for); a
-       phone on Claude with a key. */
+    /* Starts on Claude Code (the plan you already pay for). */
     provider() {
       const id = load('provider');
       const p = P.PROVIDERS.find(x => x.id === id);
