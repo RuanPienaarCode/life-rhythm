@@ -4,7 +4,8 @@
    Life priorities, practices, goals and events as plain notes — and, since
    0.2.0, the reminders module (once the Nudge plugin) and the two-week
    planner (once Fortnight), each a page of the one view. Vault API only —
-   desktop and iOS/Android. Source lives in src/ as CommonJS modules;
+   desktop and iOS/Android — except Ask AI (src/ai/): requestUrl to the AI
+   the person chose, and on desktop src/ai/cli.js runs Claude Code or Codex. Source lives in src/ as CommonJS modules;
    esbuild bundles them into main.js (target safari15 — the real engine
    floor on mobile, not minAppVersion).
 
@@ -24,6 +25,7 @@ const { makeStore } = require('./io');
 const { makeApi } = require('./api');
 const { attachReminders } = require('./reminders/host');
 const { attachPlanner } = require('./planner/host');
+const { attachAi } = require('./ai/host');
 const { mergeSettings, OLD_IDS } = require('./settings-merge');
 const D = require('./dates');
 
@@ -34,7 +36,7 @@ const NUDGE_PROTOCOL = 'nudge-reminders';
 const RHYTHM_WRITES = [
   'setFlag', 'setDone', 'setSkip', 'setSnooze', 'setPlan', 'restoreFlags', 'movePlan', 'patch', 'rename',
   'appendBody', 'appendLog', 'ensureLogNote', 'completeGoalStep', 'createArea', 'createPractice', 'createGoal',
-  'createEvent', 'seed', 'ensureTree',
+  'createEvent', 'seed', 'ensureTree', 'saveChat',
 ];
 function afterWrites(store, then) {
   const out = Object.assign({}, store);
@@ -59,6 +61,8 @@ class RhythmPlugin extends Plugin {
     this._rhythmFor = {};
     this.reminders = attachReminders(this);
     this.planner = attachPlanner(this);
+    /* Ask AI: the chat's AI, key and model (src/ai/host.js). */
+    this.ai = attachAi(this);
 
     this.registerView(VIEW_TYPE, leaf => new RhythmView(leaf, this));
     const ribbon = this.addRibbonIcon('compass', 'Open Rhythm', () => this.activateView());
@@ -88,6 +92,11 @@ class RhythmPlugin extends Plugin {
       if (this.settings.openOnStartup && !this.app.workspace.getLeavesOfType(VIEW_TYPE).length) this.activateView();
     });
   }
+
+  /* Ask AI about one item — the module boards' menus call this through
+     their hosts (reminders/host.js, planner/host.js). */
+  canAsk() { return !!this.ai && this.settings.askAi !== false && this.app.workspace.getLeavesOfType(VIEW_TYPE).length > 0; }
+  askAbout(item) { this.firstView(ctl => ctl.ctx.askAbout(item)); }
 
   registerCommands() {
     const cmd = (id, name, callback) => this.addCommand({ id, name, callback });

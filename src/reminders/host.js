@@ -41,6 +41,9 @@ function attachReminders(plugin) {
     saveData: () => plugin.saveSettings(),
     /* The boards open now, one per Rhythm pane showing the Reminders page. */
     forEachView(fn) { return plugin.forEachEmbed('reminders', fn); },
+    /* Ask AI about a reminder (its row menu). */
+    canAsk: () => !!(plugin.canAsk && plugin.canAsk()),
+    askAbout: item => { if (plugin.askAbout) plugin.askAbout(item); },
     refreshViews() { host.forEachView(ctl => ctl.refresh()); },
     async updateBadge() {
       try { host.paintBadge(M.board((await host.store.load()).items, D.todayISO()).counts); }

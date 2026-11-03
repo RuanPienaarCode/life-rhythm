@@ -63,10 +63,39 @@ const plugin = {
   rhythmStoreFor() { return plugin.rhythmStore; },
   changed() { plugin.feedChanged(); },
   feedChanged() { if (ctl && ctl.ctx.feedChanged) ctl.ctx.feedChanged(); },
+  /* as main.js */
+  canAsk() { return !!ctl && plugin.settings.askAi !== false; },
+  askAbout(item) { if (ctl) ctl.ctx.askAbout(item); },
 };
 plugin.rhythmStore = makeStore(plugin);
 plugin.reminders = attachReminders(plugin);
 plugin.planner = attachPlanner(plugin);
+/* Ask AI with a stand-in AI: no key, no network. It answers from the page
+   it was given (so the context can be checked in window.__rv.asked) and
+   suggests one change of each kind it can see. ?ai=error answers with the
+   missing-key error instead. */
+const AIP = require('../src/ai/providers');
+plugin.ai = {
+  device: { desktop: true },
+  providers: () => AIP.PROVIDERS,
+  current: () => AIP.provider('claude-code'),
+  model: () => '',
+  async ask({ system, messages }) {
+    window.__rv.asked = { system, messages };
+    await new Promise(r => setTimeout(r, 400));
+    if (q.get('ai') === 'error') throw new Error('Add your Claude API key in Settings → Rhythm → Ask AI.');
+    const t = D.todayISO();
+    const screen = system.split('On the screen:\n')[1] || '';
+    const habit = /Exercise/.test(screen) ? 'Exercise' : 'Read';
+    return { text: `I can see ${screen.split('\n').filter(Boolean).length} lines on this page. Start with the slipped fence job, then exercise.\n\n\`\`\`rhythm-actions\n` + JSON.stringify([
+      { kind: 'add_reminder', title: 'Buy paint for the fence', due: D.addDays(t, 1), time: '09:00' },
+      { kind: 'tick_habit', name: habit },
+      { kind: 'move_todo', text: 'Paint the fence on the north side of the garden', date: D.addDays(t, 1) },
+      { kind: 'note', text: 'Asked AI for a plan for today.' },
+      { kind: 'move_todo', text: 'Nothing called this', date: t },
+    ]) + '\n\`\`\`', model: 'fake' };
+  },
+};
 const view = {
   plugin,
   contentEl: document.getElementById('app'),

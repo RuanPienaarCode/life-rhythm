@@ -567,6 +567,12 @@ function mountBoard(view) {
       await reload(from); await maybeExport();
     })));
     m.addItem(i => i.setTitle('Open in the note').setIcon('pencil').onClick(() => openNote(it)));
+    if (plugin.canAsk && plugin.canAsk()) {
+      m.addItem(i => i.setTitle('Ask AI about this').setIcon('wand-2').onClick(() => plugin.askAbout({
+        kind: 'reminder', text: it.title,
+        details: [it.due && `due ${it.due}`, it.time && `at ${it.time}`, it.repeat && `repeats ${it.repeat}`, it.done && 'done'].filter(Boolean).join(' '),
+      })));
+    }
     m.addItem(i => i.setTitle('Delete').setIcon('trash-2').onClick(() => once(it, async () => {
       const r = await store.remove(it);
       if (r && r.ok === false) gone(r, 'nothing was deleted');

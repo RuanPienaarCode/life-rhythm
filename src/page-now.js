@@ -31,6 +31,13 @@ function cardMenu(ev, ctx, card) {
   }
   menu.addItem(i => i.setTitle('Edit').setIcon('pencil').onClick(() => ctx.editCard(card)));
   menu.addItem(i => i.setTitle('Open note').setIcon('external-link').onClick(() => ctx.openCard(card)));
+  if (ctx.canAsk && ctx.canAsk()) {
+    menu.addItem(i => i.setTitle('Ask AI about this').setIcon('wand-2').onClick(() => ctx.askAbout({
+      kind: card.source === 'nudge' ? 'reminder' : 'to-do',
+      text: card.text,
+      details: [card.date && `on ${card.date}`, card.time && `at ${card.time}`, card.done && 'done'].filter(Boolean).join(' '),
+    })));
+  }
   menu.addSeparator();
   menu.addItem(i => {
     i.setTitle('Delete').setIcon('trash-2').onClick(() => ctx.removeCard(card));

@@ -12,11 +12,20 @@ const root = path.join(__dirname, '..');
 const srcDir = path.join(root, 'src');
 const NODE_REQUIRES = /require\(\s*['"](?:node:)?(fs|path|os|child_process|crypto|http|https|net|electron)['"]\s*\)/;
 
-for (const f of fs.readdirSync(srcDir).filter(f => f.endsWith('.js'))) {
+/* src/ai/cli.js is the one file allowed Node, and only through
+   window.require behind Platform.isDesktopApp — never a bundled require. */
+const NODE_OK = new Set([path.join('ai', 'cli.js')]);
+const aiFiles = fs.readdirSync(path.join(srcDir, 'ai')).filter(f => f.endsWith('.js')).map(f => path.join('ai', f));
+for (const f of [...fs.readdirSync(srcDir).filter(f => f.endsWith('.js')), ...aiFiles]) {
   const text = fs.readFileSync(path.join(srcDir, f), 'utf8');
   assert.ok(!text.includes('(?<'), `${f}: lookbehind/named-group regex literal — iOS 15 fatal`);
-  assert.ok(!NODE_REQUIRES.test(text), `${f}: Node API require — mobile fatal`);
   assert.ok(!/\.innerHTML\s*=/.test(text), `${f}: innerHTML assignment — build DOM instead`);
+  if (NODE_OK.has(f)) {
+    assert.ok(!/(^|[^.\w])require\(\s*['"](?:node:)?(fs|path|os|child_process)['"]/m.test(text), `${f}: Node only through window.require`);
+    assert.ok(/Platform\.isDesktopApp/.test(text), `${f}: Node only behind Platform.isDesktopApp`);
+  } else {
+    assert.ok(!NODE_REQUIRES.test(text), `${f}: Node API require — mobile fatal`);
+  }
 }
 
 const bundlePath = path.join(root, 'main.js');

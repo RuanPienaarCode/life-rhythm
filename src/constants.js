@@ -34,6 +34,10 @@ const DEFAULT_SETTINGS = {
   /* Subscribed calendars, one URL per line (webcal:// is fine). */
   calendarUrls: '',
   calendarCache: null,
+  /* Ask AI: the round button at the bottom right. Which AI, and its key,
+     are kept per device (src/ai/host.js); only the model names ride here. */
+  askAi: true,
+  aiModels: {},
 };
 
 const FOLDERS = {

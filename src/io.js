@@ -542,6 +542,21 @@ function makeStore(plugin) {
     return true;
   }
 
+  /* An Ask AI chat kept on purpose ("Save"): a new note under Chats/, never
+     an existing one — a second save that day gets " 2", " 3"… Resolves to
+     the path written. */
+  async function saveChat(date, title, body) {
+    const folder = `${root()}/Chats`;
+    await ensureFolder(root());
+    await ensureFolder(folder);
+    const base = `${folder}/${date} ${safeName(title || 'Chat').slice(0, 80)}`;
+    for (let n = 1; n < 100; n++) {
+      const path = `${base}${n > 1 ? ' ' + n : ''}.md`;
+      if (await writeIfAbsent(path, buildNote({ rhythm: 'chat', date }, body))) return path;
+    }
+    return null;
+  }
+
   /* A goal's next step was done: record it in the body, set the new one. */
   async function completeGoalStep(path, doneStep, nextStep, date) {
     await appendBody(path, `- [x] ${date} ${doneStep}`);
@@ -561,7 +576,7 @@ function makeStore(plugin) {
 
   return {
     root, dir, load, ensureTree, createArea, createPractice, createGoal, createEvent,
-    patch, rename, appendBody, setFlag, setDone, setSkip, setSnooze, setPlan, restoreFlags, movePlan, ensureLogNote, appendLog, logPath,
+    patch, rename, appendBody, setFlag, setDone, setSkip, setSnooze, setPlan, restoreFlags, movePlan, ensureLogNote, appendLog, saveChat, logPath,
     completeGoalStep, seed, hasData, isOurs,
   };
 }

@@ -309,6 +309,14 @@ function mountBoard(view) {
       menu.addItem(i => i.setTitle('Next week (any day)').setIcon('calendar-range').setDisabled(!can.nextWeek).onClick(() => parkTo(card, nextDest(board))));
       menu.addItem(i => i.setTitle('Later').setIcon('inbox').setDisabled(!can.later).onClick(() => parkTo(card, LATER)));
     }
+    if (plugin.canAsk && plugin.canAsk()) {
+      menu.addSeparator();
+      menu.addItem(i => i.setTitle('Ask AI about this').setIcon('wand-2').onClick(() => plugin.askAbout({
+        kind: card.source === 'nudge' ? 'reminder' : card.source === 'event' ? 'event' : card.source === 'practice' ? 'habit' : 'to-do',
+        text: card.text,
+        details: [card.date && `on ${card.date}`, card.time && `at ${card.time}`].filter(Boolean).join(' '),
+      })));
+    }
     menu.showAtMouseEvent(e);
   }
 

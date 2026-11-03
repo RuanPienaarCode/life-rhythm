@@ -420,5 +420,23 @@ function makePlugin(files, stats) {
     assert.deepStrictEqual(await s.movePlan('Walk', '2026-10-09', '2026-10-09'), { prev: { from: null, to: null } });
   }
 
+  /* ---- Ask AI: a saved chat is always a NEW note under Chats/ ---- */
+  {
+    const plugin = makePlugin({ 'Rhythm/Log/2026-11-03.md': '---\nrhythm: log\ndone: [Read]\n---\n' });
+    const s = makeStore(plugin);
+    const p1 = await s.saveChat('2026-11-03', 'Today', '**You:** hi\n');
+    const p2 = await s.saveChat('2026-11-03', 'Today', '**You:** again\n');
+    const p3 = await s.saveChat('2026-11-03', 'Call: mom #1', 'x\n');
+    assert.strictEqual(p1, 'Rhythm/Chats/2026-11-03 Today.md');
+    assert.strictEqual(p2, 'Rhythm/Chats/2026-11-03 Today 2.md', 'a second save the same day never overwrites the first');
+    assert.ok(!/[:#]/.test(p3.slice('Rhythm/Chats/'.length)), 'the title is made safe for a file name');
+    const v = plugin.app.vault.store;
+    assert.ok(v.get(p1).includes('**You:** hi') && v.get(p2).includes('**You:** again'));
+    assert.ok(parseFrontmatter(v.get(p1)).fm.rhythm === 'chat');
+    const d = await s.load();
+    assert.deepStrictEqual([...d.log.get('2026-11-03').done], ['Read'], 'a chat note is not read as a log, practice or anything else');
+    assert.strictEqual(d.practices.length + d.goals.length + d.events.length + d.areas.length, 0);
+  }
+
   console.log('io OK');
 })().catch(e => { console.error(e); process.exit(1); });

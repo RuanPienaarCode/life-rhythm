@@ -249,10 +249,66 @@ class RhythmSettingTab extends PluginSettingTab {
         catch (e) { new Notice(`Rhythm: copy failed — the link is obsidian://${PROTOCOL}?tab=today`); }
       }));
 
+    this.askAiSection(containerEl, save);
+
     containerEl.createEl('h2', { text: 'Reminders' });
     moduleSection(containerEl, this.app, NudgeSettingTab, this.plugin.reminders);
     containerEl.createEl('h2', { text: 'Fortnight' });
     moduleSection(containerEl, this.app, FortnightSettingTab, this.plugin.planner);
+  }
+
+  /* Ask AI. Which AI and its key belong to THIS device (kept out of the
+     vault, so a key never syncs and the Mac can use Claude Code while the
+     phone uses a key); the model name is kept per AI in data.json. */
+  askAiSection(containerEl, save) {
+    const ai = this.plugin.ai;
+    if (!ai) return;
+    const s = this.plugin.settings;
+    containerEl.createEl('h3', { text: 'Ask AI' });
+    new Setting(containerEl)
+      .setName('Show the Ask AI button')
+      .setDesc('A round button at the bottom right. It opens a chat that can see the page you are on, and suggests changes you confirm one by one.')
+      .addToggle(t => { named(t.toggleEl, 'Show the Ask AI button'); t.setValue(s.askAi !== false).onChange(async v => { s.askAi = v; await save(); }); });
+    if (s.askAi === false) return;
+
+    const cur = ai.current();
+    new Setting(containerEl)
+      .setName('AI on this device')
+      .setDesc(ai.device.desktop
+        ? 'Claude Code and Codex use the plan you are signed in to on this computer. Claude, ChatGPT, Grok and Gemini use an API key from their own site, billed to that key. Claude Code can only answer; Codex cannot change anything, but it can read files on this computer while it answers.'
+        : 'Each uses an API key from its own site, billed to that key. Claude Code and Codex work on a computer only.')
+      .addDropdown(d => {
+        named(d.selectEl, 'AI on this device');
+        for (const p of ai.providers()) d.addOption(p.id, p.kind === 'cli' ? `${p.name} (${p.plan} plan)` : p.name);
+        d.setValue(cur.id).onChange(v => { ai.device.setProvider(v); this.display(); });
+      });
+
+    if (cur.kind === 'api') {
+      new Setting(containerEl)
+        .setName(`${cur.name} API key`)
+        .setDesc(`From ${cur.console}. Kept on this device only — it is not saved in the vault and does not sync.`)
+        .addText(t => {
+          named(t.inputEl, `${cur.name} API key`);
+          t.inputEl.type = 'password';
+          t.inputEl.autocomplete = 'off';
+          t.setPlaceholder(cur.keyHint).setValue(ai.device.key(cur.id)).onChange(v => ai.device.setKey(cur.id, v));
+        });
+    } else {
+      new Setting(containerEl)
+        .setName(`${cur.name} app`)
+        .setDesc(`Leave empty to find "${cur.bin}" in the usual places, or paste its full path.`)
+        .addText(t => { named(t.inputEl, `${cur.name} app path`); t.setPlaceholder(cur.bin).setValue(ai.device.binPath(cur.id)).onChange(v => ai.device.setBinPath(cur.id, v)); })
+        .addButton(b => b.setButtonText('Check').onClick(async () => {
+          b.setDisabled(true);
+          try { const r = await ai.check(cur.id); new Notice(`Rhythm: ${cur.name} found — ${r.version} (${r.path}).`); }
+          catch (e) { new Notice(`Rhythm: ${cur.name} did not answer — ${String((e && e.message) || e)}`); }
+          finally { b.setDisabled(false); }
+        }));
+    }
+    new Setting(containerEl)
+      .setName('Model')
+      .setDesc(cur.kind === 'api' ? `Empty uses ${cur.model}.` : 'Empty uses the app\'s own default.')
+      .addText(t => { named(t.inputEl, `${cur.name} model`); t.setPlaceholder(cur.model || 'default').setValue(ai.model(cur.id)).onChange(v => ai.setModel(cur.id, v)); });
   }
 
   cacheLine() {

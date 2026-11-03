@@ -73,6 +73,11 @@ function rowMenu(ev, ctx, r, date) {
   menu.addItem(i => i.setTitle('Edit').setIcon('pencil').onClick(() => ctx.edit('practice', p)));
   menu.addItem(i => i.setTitle('Set aside').setIcon('archive').onClick(() => ctx.setAside(p, true)));
   menu.addItem(i => i.setTitle('Open note').setIcon('external-link').onClick(() => ctx.openNote(p.path)));
+  if (ctx.canAsk && ctx.canAsk()) {
+    menu.addSeparator();
+    menu.addItem(i => i.setTitle('Ask AI about this').setIcon('wand-2')
+      .onClick(() => ctx.askAbout({ kind: 'habit', text: p.name, details: [p.cadence, p.area].filter(Boolean).join(' · ') })));
+  }
   if (menu.showAtMouseEvent && ev && ev.clientX !== undefined) menu.showAtMouseEvent(ev);
   else if (menu.showAtPosition && ev && ev.target) { const b = ev.target.getBoundingClientRect(); menu.showAtPosition({ x: b.left, y: b.bottom }); }
 }

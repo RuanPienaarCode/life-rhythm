@@ -28,6 +28,9 @@ function attachPlanner(plugin) {
     async saveSettings() { await plugin.saveSettings(); host.refreshSoon(); },
     saveData: () => plugin.saveSettings(),
     boardViews() { const out = []; plugin.forEachEmbed('planner', ctl => out.push({ ctl })); return out; },
+    /* Ask AI about a card (its menu). */
+    canAsk: () => !!(plugin.canAsk && plugin.canAsk()),
+    askAbout: item => { if (plugin.askAbout) plugin.askAbout(item); },
     refreshViews() { plugin.forEachEmbed('planner', ctl => ctl.refresh()); },
     refreshSoon() {
       window.clearTimeout(soon);

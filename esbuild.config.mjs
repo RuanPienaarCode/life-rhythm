@@ -13,7 +13,7 @@ import * as esbuild from 'esbuild';
 const root = dirname(fileURLToPath(import.meta.url));
 const rel = p => join(root, p);
 
-const CSS = ['src/styles.css', 'src/reminders/styles.css', 'src/planner/styles.css', 'src/embed.css'];
+const CSS = ['src/styles.css', 'src/reminders/styles.css', 'src/planner/styles.css', 'src/embed.css', 'src/ai/styles.css'];
 writeFileSync(rel('styles.css'), CSS.map(f => readFileSync(rel(f), 'utf8').replace(/\s+$/, '') + '\n').join('\n'));
 
 /* target safari15 = the engine floor this plugin must parse on (Obsidian

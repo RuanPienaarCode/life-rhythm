@@ -97,6 +97,14 @@ Settings → Streak: days in a row, good weeks in a row (a week counts when at l
 
 Opening Rhythm in a vault with no `Rhythm/` folder shows a setup card: start with the starter set (eight areas, fifteen practices, four goals) or start empty.
 
+## Ask AI
+
+A round button at the bottom right of every page opens a chat about the page you are on. "Ask AI about this" in an item's menu (Today, Habits, Reminders, Fortnight) asks about that one item. The AI is sent the page's text as it reads on screen, never the notes behind it; "Sees:" at the top of the chat shows exactly what it gets.
+
+- **Which AI**, chosen per device in Settings → Rhythm → Ask AI: Claude, ChatGPT, Grok or Gemini with your own API key, or on a computer Claude Code or Codex on the plan you are signed in to. Keys stay on the device (Obsidian's local storage), never in the vault, so they do not sync. Claude Code runs with no tools at all. Codex cannot change anything, but its read-only sandbox can still read files on the computer.
+- **It only suggests.** An answer can offer up to five changes — add a reminder, tick or skip a habit, move a to-do or reminder to a day, add to a day's note — each a button you tap. Each runs the same write the pages make and is refused the same way. Nothing it offers can delete, and a repeating to-do is never moved for you.
+- **Nothing is kept** unless you press Save, which writes the chat to `Rhythm/Chats/<date> <page or item>.md`. Closing the chat ends it.
+
 ## Develop
 
 ```bash
@@ -105,7 +113,7 @@ Opening Rhythm in a vault with no `Rhythm/` folder shows a setup card: start wit
 npm run preview       # build the browser harness; serve the repo and open _preview/preview.html?seeded=1
 ```
 
-Root `main.js` and `styles.css` are build output; edit `src/` only. The bundle targets Safari 15 because Obsidian mobile runs the OS WebView: no lookbehind regex, no Node APIs, no innerHTML (all test-gated). Ten design directions live in `design/` with `design/index.html` as the overview; the shipped one is 07 Apple.
+Root `main.js` and `styles.css` are build output; edit `src/` only. The bundle targets Safari 15 because Obsidian mobile runs the OS WebView: no lookbehind regex, no innerHTML, and no Node APIs except `src/ai/cli.js`, which reaches Node only through `window.require` on desktop to run Claude Code or Codex (all test-gated). Ten design directions live in `design/` with `design/index.html` as the overview; the shipped one is 07 Apple.
 
 ## Licence
 

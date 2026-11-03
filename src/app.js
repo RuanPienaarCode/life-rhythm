@@ -24,6 +24,9 @@ const { applyAccent } = require('./accents');
 const { applyBackground } = require('./backgrounds');
 const { mountEmbed, EMBEDS } = require('./embed');
 const { mountMoreSheet } = require('./more-sheet');
+const { mountAskAi } = require('./ai/chat');
+const AI = require('./ai/actions');
+const { planBoard } = require('./planner/plan');
 
 /* Rhythm's own pages, and the two module boards (Reminders, Fortnight)
    mounted as pages — see embed.js. */
@@ -87,7 +90,7 @@ function mountApp(view) {
     enter: true,
   };
 
-  let header, nav, main, toastEl, reloadTimer = null, toastTimer = null, stopped = false, resizeObserver = null;
+  let header, nav, main, toastEl, askAi = null, reloadTimer = null, toastTimer = null, stopped = false, resizeObserver = null;
   let feedLoading = false, feedAgain = false;
   /* The dock's More slot: the pages past DOCK_SLOTS, as a bottom sheet. */
   const moreSheet = mountMoreSheet(root, {
@@ -390,6 +393,65 @@ function mountApp(view) {
       } catch (e) { fail('create', e, `could not create that ${kind}.`); }
       await ctx.reload();
     },
+    /* Ask AI about one item (its menu's "Ask AI about this"). */
+    canAsk() { return !!(askAi && plugin.ai && plugin.settings.askAi !== false); },
+    askAbout(item) { if (ctx.canAsk()) askAi.open(item); },
+    /* One change an Ask AI answer suggested, after the person tapped it.
+       The same writes the pages make, refused the same way; nothing here
+       deletes. Resolves to { ok, text } for the chat to show. */
+    async runAiAction(a) {
+      const today = D.todayISO();
+      try {
+        if (a.kind === 'tick_habit' || a.kind === 'skip_habit') {
+          const f = AI.findHabit(a.name, state.data.practices);
+          if (!f.ok) return { ok: false, text: `There is no habit called "${a.name}".` };
+          const name = f.practice.name;
+          const tick = a.kind === 'tick_habit';
+          const r = await (tick ? store.setDone(a.date, name, true) : store.setSkip(a.date, name, true));
+          if (r && r.refused) return { ok: false, text: refusedText(r.refused) };
+          await ctx.reload();
+          ctx.toast(tick ? `Ticked ${name}` : `Not today: ${name}`, 'Undo', () => ctx.restore(name, a.date, r && r.prev));
+          return { ok: true };
+        }
+        if (a.kind === 'add_reminder') {
+          const R = plugin.reminders && plugin.reminders.store;
+          if (!R) return { ok: false, text: 'Reminders are not running.' };
+          const fields = { title: a.title };
+          if (a.due) fields.due = a.due;
+          if (a.time) fields.time = a.time;
+          const r = await R.add(fields);
+          if (!r || r.ok === false) return { ok: false, text: 'The reminder could not be written.' };
+          ctx.feedChanged();
+          ctx.toast(`Reminder added: ${a.title}`);
+          return { ok: true };
+        }
+        if (a.kind === 'move_todo') {
+          const pstore = plugin.planner.store;
+          const board = planBoard({ today, tasks: await pstore.load(), settings: plugin.planner.settings });
+          const cards = [...board.slipped, ...board.days.flatMap(d => d.cards), ...board.nextWeek.days.flatMap(d => d.cards), ...board.nextWeek.anyDay, ...board.later]
+            .filter(c => c.source === 'tasks' || c.source === 'nudge');
+          const f = AI.findCard(a.text, cards);
+          if (!f.ok) return { ok: false, text: f.reason === 'ambiguous' ? `More than one is called "${a.text}" — move it yourself.` : `Nothing open is called "${a.text}".` };
+          /* A repeating one keeps its rhythm only when moved by hand. */
+          if (/🔁/u.test(f.card.raw || '')) return { ok: false, text: 'That one repeats — move it on the Fortnight board.' };
+          const r = await pstore.move(f.card, a.date);
+          if (r && r.ok === false) return { ok: false, text: `Couldn't move it: ${why(r.reason)}.` };
+          ctx.feedChanged();
+          ctx.toast(`${f.card.text} → ${D.relative(a.date, today)}`);
+          return { ok: true };
+        }
+        if (a.kind === 'note') {
+          await store.appendLog(a.date, a.text);
+          await ctx.reload();
+          ctx.toast('Saved to the day\'s note', 'Open', () => ctx.openLog(a.date));
+          return { ok: true };
+        }
+      } catch (e) {
+        console.error('rhythm ai action', e);
+        return { ok: false, text: 'That could not be done: ' + String((e && e.message) || e) };
+      }
+      return { ok: false, text: 'Rhythm does not know that change.' };
+    },
     async refreshCalendars(quiet) {
       if (!urls(plugin).length) return;
       try {
@@ -512,6 +574,11 @@ function mountApp(view) {
 
   function render() {
     if (stopped) return;
+    renderPage();
+    if (askAi) askAi.sync();
+  }
+
+  function renderPage() {
     paintAccent();
     paintBackground();
     renderHeader();
@@ -619,6 +686,24 @@ function mountApp(view) {
       nav.setAttribute('role', 'tablist');
       main = el(root, 'main', 'rv-main');
       toastEl = el(root, 'div', 'rv-toast');
+      if (plugin.ai) {
+        askAi = mountAskAi(root, {
+          enabled: () => state.loaded && plugin.settings.askAi !== false && (store.hasData() || !!EMBEDS[state.tab]),
+          snapshot: focus => ({
+            page: (TABS.find(t => t.id === state.tab) || TABS[0]).label,
+            /* The pages that walk through days show the day you are on. */
+            date: ['habits', 'month', 'plan'].includes(state.tab) ? state.date : D.todayISO(),
+            today: D.todayISO(),
+            screen: main ? main.innerText : '',
+            focus,
+          }),
+          ask: args => plugin.ai.ask(args),
+          providerName: () => plugin.ai.current().name,
+          run: a => ctx.runAiAction(a),
+          save: (md, title) => store.saveChat(D.todayISO(), title, md),
+          openSettings: () => ctx.openSettings(),
+        });
+      }
       root.tabIndex = 0;
       render();
       if (view.registerEvent && app.vault.on) {
@@ -652,7 +737,7 @@ function mountApp(view) {
       if (splash) splash.leave();
       if (isStale(plugin)) ctx.refreshCalendars(true);
     },
-    stop() { stopped = true; moreSheet.close(false); dropEmbed(); if (reloadTimer) clearTimeout(reloadTimer); if (toastTimer) clearTimeout(toastTimer); if (resizeObserver) resizeObserver.disconnect(); },
+    stop() { stopped = true; moreSheet.close(false); if (askAi) askAi.stop(); dropEmbed(); if (reloadTimer) clearTimeout(reloadTimer); if (toastTimer) clearTimeout(toastTimer); if (resizeObserver) resizeObserver.disconnect(); },
     render,
     /* The pane was resized: a board that lays itself out by width (Fortnight's
        phone view) is told. */
