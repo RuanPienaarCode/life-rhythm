@@ -13,7 +13,7 @@
    DOM on the standard API only (no innerHTML), so the preview harness runs
    this exact code. What answering, running and saving DO is passed in. */
 
-const { el, button, clear } = require('../dom');
+const { el, icon, button, clear } = require('../dom');
 const C = require('./context');
 const A = require('./actions');
 const MD = require('./md');
@@ -89,6 +89,14 @@ function mountAskAi(root, o) {
     const who = el(title, 'button', 'rv-ai-who');
     who.type = 'button';
     who.addEventListener('click', e => { e.preventDefault(); o.openSettings(); });
+    const copyAll = button(head, 'rv-ai-icon rv-ai-copyall', null, null, 'copy');
+    copyAll.setAttribute('aria-label', 'Copy the whole chat');
+    copyAll.title = 'Copy the whole chat';
+    copyAll.addEventListener('click', e => {
+      e.preventDefault();
+      const snap = snapshot();
+      copy(copyAll, C.chatText({ page: snap.page + (focus ? ` · about "${focus.text}"` : ''), ai: o.providerName(), messages }));
+    });
     const save = button(head, 'rv-ai-icon', null, () => saveChat(), 'file-down');
     save.setAttribute('aria-label', 'Save this chat to a note');
     save.title = 'Save to a note';
@@ -127,7 +135,7 @@ function mountAskAi(root, o) {
       if (e.key === 'Escape') { e.preventDefault(); close(true); }
     });
 
-    ui = { wrap, panel, who, save, seen, seenSum, seenBody, log, input, send };
+    ui = { wrap, panel, who, save, copyAll, seen, seenSum, seenBody, log, input, send };
   }
 
   function grow() {
@@ -144,6 +152,7 @@ function mountAskAi(root, o) {
     ui.who.setAttribute('aria-label', `Using ${o.providerName()} — change in Settings`);
     ui.seenSum.textContent = 'Sees: ' + C.seenLine(snap);
     if (ui.seen.open) ui.seenBody.textContent = C.pageContext(snap);
+    ui.copyAll.disabled = !messages.some(m => !m.error);
     ui.save.disabled = !messages.some(m => m.role === 'assistant' && !m.error);
     ui.save.classList.toggle('is-saved', !!savedPath);
     ui.save.title = savedPath ? 'Saved to ' + savedPath : 'Save to a note';
@@ -165,6 +174,15 @@ function mountAskAi(root, o) {
       /* Your words and an error stay plain; an answer is Markdown. */
       if (m.role === 'assistant' && !m.error) MD.render(el(b, 'div', 'rv-ai-text rv-ai-md'), m.content);
       else el(b, 'div', 'rv-ai-text', m.content);
+      if (m.role === 'user') {
+        const cq = button(b, 'rv-ai-copy rv-ai-copy-q', null, () => copy(cq, m.content), 'copy');
+        cq.setAttribute('aria-label', 'Copy this question');
+        cq.title = 'Copy this question';
+      } else if (!m.error) {
+        const row = el(b, 'div', 'rv-ai-meta');
+        const ca = button(row, 'rv-ai-copy', 'Copy', () => copy(ca, String(m.content).trim()), 'copy');
+        ca.setAttribute('aria-label', 'Copy this answer');
+      }
       if (m.error && /Settings/.test(m.content)) button(b, 'rv-ai-link', 'Open Settings', () => o.openSettings());
       if (m.actions && m.actions.length) {
         const acts = el(b, 'div', 'rv-ai-acts');
@@ -228,6 +246,31 @@ function mountAskAi(root, o) {
     act.state = r && r.ok ? 'done' : 'failed';
     act.note = r && r.ok ? '' : ((r && r.text) || 'That could not be done.');
     draw();
+  }
+
+  /* Put text on the clipboard and say so on the button for a moment. A
+     refused write (no clipboard, or the window not focused) is shown as an
+     error line in the chat, never swallowed. */
+  async function copy(btn, text) {
+    try {
+      if (!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') throw new Error('this window has no clipboard');
+      await navigator.clipboard.writeText(text);
+    } catch (e) {
+      messages.push({ role: 'assistant', error: true, content: 'Could not copy: ' + String((e && e.message) || e) });
+      draw();
+      return;
+    }
+    const label = btn.querySelector('.rv-btn-label');
+    const was = label ? label.textContent : '';
+    const show = (name, words, on) => {
+      const old = btn.querySelector('.rv-icon');
+      if (old) { const fresh = icon(btn, name); btn.insertBefore(fresh, old); old.remove(); }
+      if (label) label.textContent = words;
+      btn.classList.toggle('is-copied', on);
+    };
+    show('check', 'Copied', true);
+    clearTimeout(btn._copied);
+    btn._copied = setTimeout(() => show('copy', was, false), 1600);
   }
 
   async function saveChat() {

@@ -83,4 +83,17 @@ function systemPrompt(o) {
   return [rules(o), '', '---', o.context].join('\n');
 }
 
-module.exports = { cleanScreen, pageContext, seenLine, rules, systemPrompt, MAX_SCREEN };
+/* The whole chat as plain text for the clipboard: who said what, each answer
+   as it reads on screen (its suggested-change block already taken off),
+   trimmed. An error line is not part of the conversation.
+   o: { page, ai, messages: [{ role, content, error? }] } */
+function chatText(o) {
+  const lines = [`Ask AI: ${o.page}`];
+  for (const m of o.messages || []) {
+    if (!m || m.error) continue;
+    lines.push(m.role === 'user' ? `You: ${m.content}` : `${o.ai}: ${String(m.content || '').trim()}`);
+  }
+  return lines.join('\n\n');
+}
+
+module.exports = { cleanScreen, pageContext, seenLine, rules, systemPrompt, chatText, MAX_SCREEN };

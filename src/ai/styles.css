@@ -100,10 +100,16 @@
   display: flex; flex-direction: column; gap: 10px; padding: 8px 16px 12px;
   border-top: 0.5px solid var(--rv-sep);
 }
-.rv-app .rv-ai-msg { max-width: 88%; padding: 9px 13px; border-radius: 16px; font-size: 14.5px; line-height: 1.42; }
+.rv-app .rv-ai-msg { max-width: 88%; padding: 9px 13px; border-radius: 16px; font-size: 14.5px; line-height: 1.42; position: relative; -webkit-user-select: text; user-select: text; }
 /* Obsidian makes the whole app unselectable; iOS 15 only reads the prefixed
-   property, so answers need both to be copied. */
+   property, so every message needs both to be highlighted and copied: the
+   log, each bubble (a drag can start in its padding), and the text itself.
+   Buttons stay unselectable, so a drag across a bubble never picks up the
+   words "Copy" or "Copied". */
+.rv-app .rv-ai-log { -webkit-user-select: text; user-select: text; }
 .rv-app .rv-ai-text { white-space: pre-wrap; word-break: break-word; -webkit-user-select: text; user-select: text; }
+.rv-app .rv-ai-act-note { -webkit-user-select: text; user-select: text; }
+.rv-app .rv-ai-log button { -webkit-user-select: none; user-select: none; }
 /* An answer is Markdown (src/ai/md.js). Scoped to .rv-app and set outright
    (not inherited from Obsidian's own table/pre/code rules). A table sits in a
    wrapper that scrolls sideways and keeps its natural width; a code block
@@ -178,6 +184,34 @@
   .rv-app button.rv-ai-link:hover { background: var(--rv-sep); }
 }
 .rv-app .rv-ai-act-note { margin: -2px 2px 2px; font-size: 12.5px; color: var(--rv-warn); }
+
+/* Copy: a small labelled button under each answer, an icon-only one beside
+   each question (shown on hover; .6 where there is no hover), and one in the
+   header for the whole chat. Frost has no colour: "Copied" is ink on a fill. */
+.rv-app .rv-ai-meta { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.rv-app button.rv-ai-copy {
+  display: inline-flex; align-items: center; gap: 5px; flex: none; height: 26px; padding: 0 9px; margin: 0;
+  border: 0; border-radius: 100px; background: var(--rv-fill); box-shadow: none; color: var(--rv-dim);
+  font-size: 12px; font-weight: 500; line-height: 1; cursor: pointer;
+  -webkit-user-select: none; user-select: none;
+}
+.rv-app button.rv-ai-copy .rv-icon { display: inline-flex; width: 13px; height: 13px; }
+.rv-app button.rv-ai-copy .rv-icon svg { width: 13px; height: 13px; }
+.rv-app button.rv-ai-copy.is-copied, .rv-app button.rv-ai-icon.is-copied { background: var(--rv-fill-2); color: var(--rv-ink); }
+.rv-app button.rv-ai-copy-q {
+  position: absolute; left: -34px; top: 50%; width: 28px; height: 28px; padding: 0; margin: -14px 0 0;
+  justify-content: center; background: transparent; opacity: 0; transition: opacity 120ms ease;
+}
+.rv-app button.rv-ai-copy-q .rv-icon, .rv-app button.rv-ai-copy-q .rv-icon svg { width: 15px; height: 15px; }
+.rv-app button.rv-ai-copy-q.is-copied { opacity: 1; background: var(--rv-fill-2); }
+.rv-app .rv-ai-msg.is-you button.rv-ai-copy-q:focus-visible { opacity: 1; }
+@media (hover: hover) {
+  .rv-app button.rv-ai-copy:hover { background: var(--rv-fill-2); color: var(--rv-ink); }
+  .rv-app .rv-ai-msg.is-you:hover button.rv-ai-copy-q { opacity: 1; }
+}
+@media (hover: none) {
+  .rv-app button.rv-ai-copy-q { opacity: 0.6; }
+}
 
 .rv-app .rv-ai-empty { margin: auto 0; padding: 16px 4px; text-align: center; }
 .rv-app .rv-ai-empty-lead { margin: 0 0 6px; font-size: 16px; font-weight: 600; letter-spacing: -0.2px; }
